@@ -1,0 +1,86 @@
+/* No Cargo: visual claro, de leitura fácil, primeiro no celular. Cores: grafite, verde-água nos dados, e os três selos. */
+:root{--fundo:#F3F6FA;--tinta:#16202B;--suave:#566272;--linha:#DCE3EC;--cartao:#fff;--menta:#DDEFEF;--dados:#0E8A8A;--link:#0B6B6B;--escuro:#16202B}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fundo);color:var(--tinta);font:17px/1.55 "Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif}
+a{color:var(--link)}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(--tinta);outline-offset:2px}
+h1,h2,h3{line-height:1.15;margin:0}
+h2{font-size:22px}h3{font-size:20px}
+.so-leitor{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.topo{background:#fff;border-bottom:1px solid var(--linha);padding:10px 20px 0}
+.marca{display:flex;align-items:center;gap:10px;font-weight:700;font-size:20px}
+.marca a{color:var(--tinta);text-decoration:none}
+.logo{display:inline-flex;width:36px;height:36px;border-radius:12px;background:var(--dados);color:#fff;align-items:center;justify-content:center}
+.topo nav{display:flex;gap:4px;overflow-x:auto;margin:4px -8px 0}
+.topo nav a{display:inline-flex;align-items:center;min-height:48px;padding:0 10px;color:var(--tinta);text-decoration:none;border-bottom:3px solid transparent;white-space:nowrap}
+.topo nav a[aria-current]{font-weight:700;color:var(--link);border-bottom-color:var(--dados)}
+main{max-width:720px;margin:0 auto}
+.heroi{background:var(--menta);padding:26px 20px 24px;border-radius:0 0 28px 28px;display:flex;flex-direction:column;gap:12px}
+.heroi h1{font-size:34px}.heroi p{margin:0;font-size:18px;color:#2A4545}
+.sobretitulo{font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:#0B5555;font-weight:700}
+.secao{padding:20px 20px 4px;display:flex;flex-direction:column;gap:14px}
+.card{background:var(--cartao);border:1px solid var(--linha);border-radius:20px;padding:16px}
+.card p{margin:6px 0 0}
+.aguardando{background:#E9EEF5;border-color:#CBD5E3}
+.obra{background:var(--fundo);border:2px dashed #A9B4C6}
+.obra p{color:var(--suave);font-size:15px}
+.nota{color:var(--suave);font-size:14px;margin:8px 0 0}
+.aviso{margin:0;font-size:14px;color:#3C5A5A}
+.selo{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;font-size:14px;font-weight:700;line-height:1.3}
+.selo.novato{background:#F6C21B;color:#2B2100}
+.selo.reeleito{background:#2F6FDB;color:#fff}
+.selo.retorno{background:#E8690B;color:#2B1400}
+.selo.provisorio{background:#fff;color:var(--tinta);border:2px dashed #7A8798}
+.selo.obra-selo{background:#E3EAF2;color:#3A4A60;font-size:13px}
+.poder{margin-top:14px;background:var(--escuro);color:#fff;border-radius:24px;padding:18px;display:flex;flex-direction:column;gap:6px}
+.poder p{margin:0;color:#D6DEE8;font-size:16px}.poder .quem{color:#9FB0C4;font-size:14px}
+.poder-nome{display:flex;align-items:center;gap:12px}.poder h2{font-size:26px}
+.poder-num{display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:14px;background:var(--dados);font-weight:700;font-size:22px}
+.esfera{display:flex;align-items:center;gap:10px;padding:4px 4px 0}
+.esfera span{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#0B5555}
+.esfera i{flex:1;height:2px;background:#C8D6D6;border-radius:2px}.esfera small{color:var(--suave);font-size:14px}
+.casa .sub{color:var(--suave);font-size:15px;margin:2px 0 14px}
+.faixa{display:flex;gap:2px;height:22px}.faixa span{min-width:6px;border-radius:6px}
+.legenda{list-style:none;margin:12px 0 0;padding:0}
+.legenda li{display:flex;align-items:center;gap:10px;min-height:32px}
+.legenda .ponto{flex:none;width:14px;height:14px;border-radius:5px}.legenda .nome{flex:1}.legenda .pct{width:44px;text-align:right;color:var(--suave);font-size:14px}
+.selos{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid #E6EBF2}
+.heroi .selos{border:0;padding:0;margin:0}
+.selos .qtd{font-weight:700;margin-right:8px}
+.seletor input,.controles input{width:100%;min-height:52px;padding:0 16px;font:inherit;font-size:18px;border:2px solid #C8D2DF;border-radius:14px;background:#fff;color:var(--tinta)}
+.filtros{display:flex;gap:8px;overflow-x:auto;align-items:center;margin-top:12px;padding-bottom:2px}
+.filtros span{flex:none;color:var(--suave);font-size:15px}
+.filtro{flex:none;min-height:44px;padding:0 16px;border-radius:999px;font:inherit;font-weight:700;font-size:16px;cursor:pointer;background:#fff;color:var(--tinta);border:2px solid #C8D2DF}
+.filtro[aria-pressed=true]{background:var(--tinta);color:#fff;border-color:var(--tinta)}
+.lista-estados{list-style:none;margin:12px -16px -16px;padding:0;max-height:260px;overflow-y:auto}
+.lista-estados li[hidden]{display:none}
+.lista-estados a{display:flex;align-items:center;gap:8px;min-height:52px;padding:0 16px;border-top:1px solid #E6EBF2;color:var(--tinta);text-decoration:none}
+.lista-estados a span{color:var(--suave);font-size:15px}.lista-estados a i{margin-left:auto;font-size:22px;color:var(--link);font-style:normal}
+.controles{position:sticky;top:0;z-index:2;box-shadow:0 8px 20px rgba(22,32,43,.1)}
+.contagem{margin:10px 0 0;color:var(--suave);font-size:14px}
+.itens{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+.pessoa{display:flex;align-items:center;gap:14px;padding:12px 14px;color:var(--tinta);text-decoration:none}
+.pessoa[hidden]{display:none}
+.pessoa .dados{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}.pessoa .dados>span{color:var(--suave);font-size:14px}.pessoa .selo{align-self:flex-start;font-size:13px;margin-top:4px}
+.pessoa i{font-size:24px;color:var(--link);font-style:normal}
+.foto{flex:none;border-radius:50%;background:#DCE5F0;object-fit:cover}
+.ficha .voltar{color:#0B5555;display:inline-flex;align-items:center;min-height:44px}
+.cabeca{display:flex;align-items:center;gap:16px}.cabeca p{margin:2px 0 0;font-size:16px}.cabeca h1{font-size:28px}
+.destaque-novato{background:#FFF6D1;border-color:#F0D568;display:flex;gap:12px;align-items:flex-start}.destaque-novato p{margin:0;color:#3A2F00;font-size:16px}
+.grande{font-size:30px;font-weight:700;line-height:1.1;color:#0B5555;margin:0}.grande.cinza{color:var(--suave)}
+.tempo{list-style:none;margin:16px 0 0;padding:16px 0 0;border-top:1px solid #E6EBF2}
+.tempo li{position:relative;display:flex;gap:14px;padding-bottom:20px}
+.tempo li:not(:last-child)::before{content:"";position:absolute;left:10px;top:24px;bottom:0;width:3px;background:#C8D2DF;border-radius:2px}
+.tempo .ponto{flex:none;width:22px;height:22px;border-radius:50%}
+.tempo li>div{display:flex;flex-direction:column;min-width:0}.tempo b{font-size:18px}.tempo small{color:var(--suave);font-size:15px}
+.tempo .atual .ponto{background:var(--dados);box-shadow:0 0 0 5px #CFE9E9}.tempo .mandato .ponto{background:var(--dados)}
+.tempo .proximo .ponto{border:3px dashed var(--dados);background:#fff}.tempo .candidatura .ponto{border:3px solid #8A97A8;background:#fff}
+.numeros{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.numero span{font-size:14px;color:var(--suave)}.numero b{display:block;font-size:20px}.numero small{color:var(--suave);font-size:13px}
+.cargo .fato{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid #E6EBF0}.cargo .fato span{color:var(--suave)}.cargo .fato b{text-align:right}
+.cargo p{margin:8px 0 12px}
+.perguntas p{margin:0 0 14px}
+.legenda-selos p{margin:0 0 12px;display:flex;gap:10px;align-items:center}
+.rodape{margin-top:24px;padding:28px 20px 36px;background:var(--escuro);color:#E3E9F0;display:flex;flex-direction:column;gap:10px;font-size:15px}
+.rodape b{color:#fff;font-size:18px}.rodape p{margin:0}.rodape a{color:#fff}
+@media (min-width:760px){.topo{padding:10px 40px 0}.heroi{border-radius:0 0 36px 36px;padding:36px 40px}main{max-width:900px}}
