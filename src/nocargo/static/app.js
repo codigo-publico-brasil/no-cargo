@@ -63,4 +63,16 @@
       b.addEventListener("click", function () { regiao = b.dataset.regiao; ativar(b.parentNode, "data-regiao", regiao); filtrar(); });
     });
   }
+
+  // Passar o mouse (ou focar) em um partido da legenda destaca as cadeiras dele no hemiciclo.
+  document.querySelectorAll(".hemiciclo").forEach(function (h) {
+    function destacar(g) {
+      h.classList.toggle("destaque", g !== null);
+      h.querySelectorAll("circle").forEach(function (c) { c.classList.toggle("ativo", g !== null && c.classList.contains("g" + g)); });
+    }
+    h.querySelectorAll("li[data-grupo]").forEach(function (li) {
+      ["mouseenter", "focus"].forEach(function (ev) { li.addEventListener(ev, function () { destacar(li.dataset.grupo); }); });
+      ["mouseleave", "blur"].forEach(function (ev) { li.addEventListener(ev, function () { destacar(null); }); });
+    });
+  });
 })();

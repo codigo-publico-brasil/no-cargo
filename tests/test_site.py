@@ -2,8 +2,9 @@ import re
 from datetime import date
 from pathlib import Path
 
-from nocargo import dados, formato
+from nocargo import cores, dados, formato
 from nocargo.__main__ import construir
+from nocargo.cores import SEM_COR
 
 HOJE = date(2026, 10, 25)
 
@@ -37,11 +38,69 @@ def test_brazil_page_separates_the_three_powers_and_their_spheres(warehouse, tmp
     assert "Aguardando o resultado do 2º turno" in pagina  # o presidente ainda não tem eleito
 
 
-def test_party_bar_orders_by_seats_keeps_five_and_groups_the_rest(warehouse, tmp_path):
-    barra = formato.faixa({f"P{i}": 10 - i for i in range(8)}, pendentes=2)
-    nomes = re.findall(r'<span class="nome">([^<]+)</span>', barra)
-    assert nomes == ["P0", "P1", "P2", "P3", "P4", "Outros partidos", "Aguardando 2º turno"]
-    assert "indicam partido" in barra  # a legenda avisa que a cor não identifica partido
+def test_party_bar_orders_by_seats_and_shows_every_party_in_its_own_brand_color():
+    barra = formato.faixa({"PT": 5, "PL": 9, "NOVO": 2}, pendentes=2)
+    assert re.findall(r'<span class="nome">([^<]+)</span>', barra) == [
+        "PL",
+        "PT",
+        "NOVO",
+        "Aguardando 2º turno",
+    ]
+    assert "background:#0F0073" in barra and "background:#DA1208" in barra and "background:#FF8511" in barra
+    assert "posição política" in barra and "cor de marca" in barra
+
+
+def test_party_without_a_registered_color_is_gray_and_the_legend_says_so():
+    barra = formato.faixa({"PL": 3, "MISSÃO": 1})
+    assert f"background:{SEM_COR}" in barra and "sem cor registrada" in barra
+    assert "sem cor registrada" not in formato.faixa({"PL": 3})  # todos com cor: nada a avisar
+
+
+def test_party_names_are_matched_the_way_the_tse_writes_them():
+    assert cores.cor_do_partido("PC do B") == cores.cor_do_partido("PCdoB") == "#DA251C"
+    assert cores.cor_do_partido("UNIÃO") == "#40CCFF" and cores.cor_do_partido("inexistente") is None
+
+
+def test_every_registered_color_is_a_valid_hex_and_keys_are_normalized():
+    for chave, cor in cores.CORES.items():
+        assert re.fullmatch(r"#[0-9A-F]{6}", cor), chave
+        assert chave == cores.chave(chave)
+
+
+def test_hemicycle_has_one_dot_per_seat_grouped_by_party_from_largest_to_smallest():
+    svg = formato.hemiciclo({"PT": 3, "PL": 5, "NOVO": 2}, "deputados")
+    bolas = re.findall(r'<circle class="g(\d+)"', svg)
+    assert len(bolas) == 10
+    assert [bolas.count(str(i)) for i in range(3)] == [5, 3, 2]  # do maior para o menor
+    assert re.findall(r'<span class="nome">([^<]+)</span>', svg) == ["PL", "PT", "NOVO"]
+    assert 'fill="#0F0073"' in svg  # as bolinhas do PL, na cor do PL
+    assert ">10</text>" in svg and "deputados" in svg and "não por posição política" in svg
+
+
+def test_hemicycle_dots_stay_inside_the_drawing_and_never_overlap_for_any_size():
+    for total, partidos in ((1, 1), (3, 2), (10, 4), (24, 6), (81, 14), (513, 20), (1035, 25)):
+        base, resto = divmod(total, partidos)
+        contagens = {f"P{i}": base + (1 if i < resto else 0) for i in range(partidos)}
+        svg = formato.hemiciclo(contagens, "deputados")
+        largura, altura = map(float, re.search(r'viewBox="0 0 ([\d.]+) ([\d.]+)"', svg).groups())
+        bolas = [
+            (float(x), float(y), float(r))
+            for x, y, r in re.findall(r'cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"', svg)
+        ]
+        assert len(bolas) == total
+        for x, y, r in bolas:
+            assert r <= formato.RAIO_MAXIMO
+            assert r <= x <= largura - r and r <= y <= altura - r  # a bolinha inteira cabe no desenho
+        for i, (x1, y1, r1) in enumerate(bolas):
+            for x2, y2, r2 in bolas[i + 1 :]:
+                assert (x1 - x2) ** 2 + (y1 - y2) ** 2 >= (r1 + r2) ** 2 * 0.99, (total, x1, y1, x2, y2)
+
+
+def test_person_list_badges_are_not_overridden_by_the_gray_text_rule():
+    css = (Path(__file__).parent.parent / "src" / "nocargo" / "static" / "style.css").read_text(
+        encoding="utf-8"
+    )
+    assert ".pessoa .dados>span:not(.selo)" in css  # a regra do texto cinza não pode pintar o selo
 
 
 def test_state_page_lists_the_elected_with_badges_and_filters_data(warehouse, tmp_path):
@@ -49,6 +108,7 @@ def test_state_page_lists_the_elected_with_badges_and_filters_data(warehouse, tm
     assert 'data-tipo="novato"' in pagina and 'data-tipo="reeleito"' in pagina
     assert "Novato" in pagina and "Reeleito" in pagina and "Retorno" in pagina
     assert pagina.index("Ana Exemplo") < pagina.index("Bruno Modelo")  # ordem alfabética por padrão
+    assert 'class="hemiciclo"' in pagina  # a bancada aparece em meia-lua
     assert "Aguardando o 2º turno" not in pagina  # o governador do RJ está eleito
     assert "Aguardando o 2º turno" in texto(site(warehouse, tmp_path), "estado/SP.html")
 

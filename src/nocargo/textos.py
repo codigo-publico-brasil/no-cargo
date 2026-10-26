@@ -85,6 +85,7 @@ def como_calculamos() -> str:
         "<li>Mesmo modelo de página e mesmos campos, na mesma ordem, para todos os partidos.</li>"
         "<li>Listas de pessoas começam em ordem alfabética; quem quiser filtra ou ordena. A barra de partidos vai do que tem mais cadeiras ao que tem menos, e as cores só separam os grupos.</li>"
         "<li>Os selos Novato, Reeleito e Retorno são iguais para todos os partidos.</li>"
+        "<li>Cada partido aparece na sua cor de marca, registrada no Wikidata. Partido sem cor registrada aparece em cinza, e nenhuma cor é inventada. A ordem é sempre do maior para o menor número de cadeiras.</li>"
         "<li>Só dados públicos e oficiais, sem CPF, endereço ou telefone. Sem antecedentes, processos ou palavras de opinião.</li></ul>"
         "<h2>Encontrou um erro?</h2><p>Diga qual página e qual dado, com o link da fonte. Corrigimos o que estiver errado, mostrando a data da correção.</p>"
         "</div>",
