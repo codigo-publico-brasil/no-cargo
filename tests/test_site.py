@@ -169,12 +169,13 @@ def test_an_elected_without_a_link_gets_no_novato_badge_and_says_the_history_is_
     warehouse, tmp_path
 ):
     saida = site(warehouse, tmp_path)
-    pagina = texto(saida, "pessoa/2026-RJ-2.html")  # Bruno: deputado federal sem ligação a uma pessoa
+    pagina = texto(
+        saida, "pessoa/2026-SP-6.html"
+    )  # deputado estadual sem ligação e sem eleição anterior achada
     assert "Histórico de mandatos não confirmado" in pagina and "não quer dizer que seja novata" in pagina
     assert "Novato" not in pagina and "Primeiro mandato na" not in pagina
-    assert "Histórico de mandatos não confirmado" in texto(
-        saida, "pessoa/2026-SP-6.html"
-    )  # estadual sem ligação
+    bruno = texto(saida, "pessoa/2026-RJ-2.html")  # sem ligação à Câmara, mas com eleição anterior no TSE
+    assert "Novato" not in bruno and "Primeiro mandato na" not in bruno
 
 
 def test_novato_only_appears_for_someone_linked_and_without_a_previous_mandate(warehouse, tmp_path):
@@ -277,6 +278,14 @@ def test_a_win_for_another_office_appears_as_a_mandate_from_the_election_result(
     assert pagina.index("Eleito em 2014") > pagina.index(
         "Candidatura em 2018"
     )  # do mais recente para o mais antigo
+
+
+def test_an_elected_without_a_link_shows_the_earlier_elections_found_in_the_tse(warehouse, tmp_path):
+    pagina = texto(site(warehouse, tmp_path), "pessoa/2026-RJ-2.html")  # Bruno
+    assert "Já foi eleito antes" in pagina and "Eleito em 2018" in pagina
+    assert "Deputado federal, mandato previsto de 2019 a 2022" in pagina
+    assert "Candidatura em 2014" in pagina and "Vereador, suplente" in pagina
+    assert "Histórico de mandatos não confirmado" not in pagina  # há prova no TSE
 
 
 def test_state_and_person_pages_say_where_you_are_and_link_back(warehouse, tmp_path):
