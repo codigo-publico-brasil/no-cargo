@@ -41,7 +41,26 @@ POSSE = date(2027, 2, 1)
 # id, uf, cargo, nome de urna, partido, votos, id_pessoa, tipo_mandato
 PESSOAS_ELEITAS = [
     ("2026:RJ:1", "RJ", "Deputado federal", "Ana Exemplo", "Partido A", 142300, 10, "reeleito"),
-    ("2026:RJ:2", "RJ", "Deputado federal", "Bruno Modelo", "Partido B", 98100, None, "novato"),
+    (
+        "2026:RJ:2",
+        "RJ",
+        "Deputado federal",
+        "Bruno Modelo",
+        "Partido B",
+        98100,
+        None,
+        None,
+    ),  # sem ligação: sem selo
+    (
+        "2026:RJ:8",
+        "RJ",
+        "Deputado federal",
+        "Nina Nova",
+        "Partido B",
+        50500,
+        14,
+        "novato",
+    ),  # ligada, sem mandato antes
     ("2026:RJ:3", "RJ", "Deputado federal", "<b>Carla</b> Teste", "Partido C", 201500, 12, "retorno"),
     ("2026:RJ:4", "RJ", "Senador", "Paulo Exemplo", "Partido B", 3100000, None, "novato"),
     ("2026:RJ:5", "RJ", "Governador", "Diego Amostra", "Partido A", 2400000, None, None),
@@ -77,14 +96,17 @@ def warehouse(tmp_path) -> Iterator[duckdb.DuckDBPyConnection]:
             "INSERT INTO marts.eleitos_cargos VALUES (2026, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (uf, uf, cargo, vagas, eleitos, vagas - eleitos, status, POSSE, CAPTURA),
         )
-    con.execute("INSERT INTO marts.pessoas VALUES (10, 'https://exemplo.gov.br/foto10.jpg'), (12, NULL)")
+    con.execute(
+        "INSERT INTO marts.pessoas VALUES (10, 'https://exemplo.gov.br/foto10.jpg'), (12, NULL), (14, NULL)"
+    )
     con.execute(
         "INSERT INTO marts.candidaturas VALUES (10, 2022, 1, 'RJ', 'Deputado federal', 'Partido A', 'Eleito por qp', ?),"
         " (10, 2026, 1, 'RJ', 'Deputado federal', 'Partido A', 'Eleito por qp', ?),"
         " (12, 2018, 1, 'RJ', 'Deputado estadual', 'Partido C', 'Não eleito', ?),"
         " (10, 2018, 1, 'RJ', 'Governador', 'Partido A', '2º turno', ?),"
-        " (10, 2018, 2, 'RJ', 'Governador', 'Partido A', 'Não eleito', ?)",
-        (CAPTURA, CAPTURA, CAPTURA, CAPTURA, CAPTURA),
+        " (10, 2018, 2, 'RJ', 'Governador', 'Partido A', 'Não eleito', ?),"
+        " (10, 2014, 1, 'RJ', 'Governador', 'Partido A', 'Eleito', ?)",
+        (CAPTURA, CAPTURA, CAPTURA, CAPTURA, CAPTURA, CAPTURA),
     )
     con.execute(
         "INSERT INTO marts.mandatos VALUES (10, 'Câmara dos Deputados', 'Deputado federal', 'RJ', NULL, NULL, ?, ?),"

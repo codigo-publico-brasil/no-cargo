@@ -10,6 +10,7 @@ MESES = ["jan.", "fev.", "mar.", "abr.", "mai.", "jun.", "jul.", "ago.", "set.",
 
 LISTRADO = "repeating-linear-gradient(45deg,#9AA5B1 0 4px,#E3E9F0 4px 8px)"
 
+CASA_DO_CARGO = {"Senador": "no Senado", "Deputado federal": "na Câmara"}
 SELOS = {
     "novato": ("novato", "&#9733; Novato"),
     "reeleito": ("reeleito", "&#10003; Reeleito"),
@@ -56,10 +57,13 @@ def reais(valor: object) -> str:
     return f"R$ {v:.0f}"
 
 
-def selo(tipo_mandato: str | None, feminino: bool = False) -> str:
+def selo(tipo_mandato: str | None, cargo: str | None = None) -> str:
+    """O selo do tipo de mandato. Novato diz a casa (`Novato no Senado`), porque é o primeiro mandato naquela casa."""
     if tipo_mandato not in SELOS:
         return ""
     classe, texto = SELOS[tipo_mandato]
+    if tipo_mandato == "novato" and cargo in CASA_DO_CARGO:
+        texto += f" {CASA_DO_CARGO[cargo]}"
     return f'<span class="selo {classe}">{texto}</span>'
 
 
