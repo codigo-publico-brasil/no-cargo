@@ -77,6 +77,16 @@ def candidaturas(con: Connection, id_pessoa: int) -> list[Row]:
     )
 
 
+def historico(con: Connection, id_candidatura: str) -> list[Row]:
+    """Candidaturas anteriores do eleito achadas nas eleições do TSE (mesmo nome civil e nascimento, únicos)."""
+    return rows(
+        con,
+        "SELECT ano_eleicao, turno, uf, cargo, partido, resultado, dt_captura FROM marts.eleitos_historico "
+        "WHERE id_candidatura = ? ORDER BY ano_eleicao DESC",
+        (id_candidatura,),
+    )
+
+
 def mandatos(con: Connection, id_pessoa: int) -> list[Row]:
     """Mandatos da pessoa na Câmara e no Senado, do mais recente para o mais antigo.
 

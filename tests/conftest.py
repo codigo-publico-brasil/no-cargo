@@ -33,6 +33,11 @@ CREATE TABLE marts.candidaturas (
     id_pessoa bigint, ano_eleicao integer, turno integer, uf varchar, cargo varchar, partido varchar,
     resultado varchar, dt_captura date
 )"""
+HISTORICO = """
+CREATE TABLE marts.eleitos_historico (
+    id_candidatura varchar, ano_eleicao integer, turno integer, uf varchar, cargo varchar, partido varchar,
+    resultado varchar, dt_captura date
+)"""
 MANDATOS = """
 CREATE TABLE marts.mandatos (
     id_pessoa bigint, casa varchar, cargo varchar, uf varchar, dt_inicio date, dt_fim date,
@@ -78,7 +83,7 @@ PESSOAS_ELEITAS = [
 def warehouse(tmp_path) -> Iterator[duckdb.DuckDBPyConnection]:
     con = duckdb.connect(str(tmp_path / "warehouse.duckdb"))
     con.execute("CREATE SCHEMA marts")
-    for ddl in (ELEITOS, CAMPANHAS, CARGOS, PESSOAS, CANDIDATURAS, MANDATOS):
+    for ddl in (ELEITOS, CAMPANHAS, CARGOS, PESSOAS, CANDIDATURAS, MANDATOS, HISTORICO):
         con.execute(ddl)
     for id_, uf, cargo, urna, partido, votos, pessoa, tipo in PESSOAS_ELEITAS:
         con.execute(
@@ -122,5 +127,14 @@ def warehouse(tmp_path) -> Iterator[duckdb.DuckDBPyConnection]:
         " (10, 'Câmara dos Deputados', 'Deputado federal', 'RJ', NULL, NULL, ?, ?)",
         (date(2019, 2, 1), date(2023, 1, 31), date(2023, 2, 1), date(2027, 1, 31)),
     )  # como no banco real: só a legislatura tem data
+    # Bruno (sem ligação à Câmara) tem uma eleição anterior achada no TSE: foi eleito deputado federal em 2018
+    con.execute(
+        "INSERT INTO marts.eleitos_historico VALUES ('2026:RJ:2', 2018, 1, 'RJ', 'Deputado federal', 'Partido B', 'Eleito por qp', ?)",
+        (CAPTURA,),
+    )
+    con.execute(
+        "INSERT INTO marts.eleitos_historico VALUES ('2026:RJ:2', 2014, 1, 'RJ', 'Vereador', 'Partido B', 'Suplente', ?)",
+        (CAPTURA,),
+    )
     yield con
     con.close()

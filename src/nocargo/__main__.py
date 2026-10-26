@@ -49,6 +49,12 @@ def construir(con: dados.Connection, saida: Path, hoje: date | None = None) -> i
     for r in eleitos:
         mandatos = dados.mandatos(con, r["id_pessoa"]) if r["id_pessoa"] else []
         candidaturas = dados.candidaturas(con, r["id_pessoa"]) if r["id_pessoa"] else []
+        vistas = {(c["ano_eleicao"], c["cargo"]) for c in candidaturas}
+        candidaturas += [
+            h
+            for h in dados.historico(con, r["id_candidatura"])
+            if (h["ano_eleicao"], h["cargo"]) not in vistas
+        ]
         desde = dados.ininterrupto_desde(mandatos, hoje)
         escrever(
             saida / "pessoa" / f"{endereco(r['id_candidatura'])}.html",
