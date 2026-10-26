@@ -104,8 +104,9 @@ def warehouse(tmp_path) -> Iterator[duckdb.DuckDBPyConnection]:
         " (10, 2026, 1, 'RJ', 'Deputado federal', 'Partido A', 'Eleito por qp', ?),"
         " (12, 2018, 1, 'RJ', 'Deputado estadual', 'Partido C', 'Não eleito', ?),"
         " (10, 2018, 1, 'RJ', 'Governador', 'Partido A', '2º turno', ?),"
-        " (10, 2018, 2, 'RJ', 'Governador', 'Partido A', 'Não eleito', ?)",
-        (CAPTURA, CAPTURA, CAPTURA, CAPTURA, CAPTURA),
+        " (10, 2018, 2, 'RJ', 'Governador', 'Partido A', 'Não eleito', ?),"
+        " (10, 2014, 1, 'RJ', 'Governador', 'Partido A', 'Eleito', ?)",
+        (CAPTURA, CAPTURA, CAPTURA, CAPTURA, CAPTURA, CAPTURA),
     )
     con.execute(
         "INSERT INTO marts.mandatos VALUES (10, 'Câmara dos Deputados', 'Deputado federal', 'RJ', NULL, NULL, ?, ?),"

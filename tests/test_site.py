@@ -170,9 +170,9 @@ def test_an_elected_without_a_link_gets_no_novato_badge_and_says_the_history_is_
     pagina = texto(saida, "pessoa/2026-RJ-2.html")  # Bruno: deputado federal sem ligação a uma pessoa
     assert "Histórico de mandatos não confirmado" in pagina and "não quer dizer que seja novata" in pagina
     assert "Novato" not in pagina and "Primeiro mandato na" not in pagina
-    assert "Histórico de mandatos não disponível" in texto(
+    assert "Histórico de mandatos não confirmado" in texto(
         saida, "pessoa/2026-SP-6.html"
-    )  # estadual: sem base de mandatos
+    )  # estadual sem ligação
 
 
 def test_novato_only_appears_for_someone_linked_and_without_a_previous_mandate(warehouse, tmp_path):
@@ -230,3 +230,13 @@ def test_a_deputy_elected_senator_is_novato_in_the_senate_and_the_page_says_the_
     pagina = texto(site(warehouse, tmp_path), "pessoa/2026-RJ-4.html")
     assert "Primeiro mandato no Senado Federal." in pagina and "Já exerceu mandato na outra casa" in pagina
     assert "Primeiro mandato no Congresso" not in pagina
+
+
+def test_a_win_for_another_office_appears_as_a_mandate_from_the_election_result(warehouse, tmp_path):
+    pagina = texto(site(warehouse, tmp_path), "pessoa/2026-RJ-1.html")
+    assert "Eleito em 2014" in pagina and "Governador, mandato previsto de 2015 a 2018" in pagina
+    assert "não registra afastamentos" in pagina
+    assert "Eleito em 2022" not in pagina  # deputado federal: o mandato já vem da Câmara
+    assert pagina.index("Eleito em 2014") > pagina.index(
+        "Candidatura em 2018"
+    )  # do mais recente para o mais antigo

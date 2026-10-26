@@ -55,8 +55,7 @@ def cargos() -> str:
         '<div class="card perguntas">'
         "<p><b>O que é um mandato?</b><br>O tempo que a pessoa fica no cargo depois de eleita.</p>"
         "<p><b>O que é ser eleito de novo?</b><br>Quem já estava no cargo e ganhou outra vez. Chamamos de reeleito.</p>"
-        "<p><b>Por que o selo de novato não aparece nos deputados estaduais?</b><br>Só temos o histórico de mandatos da Câmara e do Senado. "
-        "Para os outros cargos mostramos o mandato novo e as candidaturas, sem palpite.</p></div>",
+        "<p><b>Por que algumas pessoas aparecem sem selo?</b><br>Quando não conseguimos ligar a pessoa às eleições e aos mandatos anteriores, não afirmamos nada: nem novata, nem reeleita.</p></div>",
         '<p class="nota">Fonte: Constituição Federal, artigos 27, 28, 44 a 46, 77 e 82.</p>',
         "</div>",
     ]

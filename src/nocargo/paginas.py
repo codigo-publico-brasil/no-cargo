@@ -389,35 +389,59 @@ def ficha(
             f"Termina no início de {inicio + anos}. Eleito em {r['ano_eleicao']}, resultado provisório.",
         )
     ]
+    passado: list[
+        tuple[int, tuple[str, str, str, str]]
+    ] = []  # (ano, item): do mais recente para o mais antigo
     for m in mandatos_da_pessoa:
         em_curso = m["dt_fim"] is None or m["dt_fim"] >= hoje
-        itens.append(
+        passado.append(
             (
-                "atual" if em_curso else "mandato",
-                "Mandato atual" if em_curso else f"Mandato como {str(m['cargo']).lower()}",
-                f"{mes_ano(m['dt_inicio'])} a {mes_ano(m['dt_fim'])}",
-                f"Fonte: {'Senado Federal' if m['casa'] == 'Senado Federal' else 'Câmara dos Deputados'}.",
+                m["dt_inicio"].year,
+                (
+                    "atual" if em_curso else "mandato",
+                    "Mandato atual" if em_curso else f"Mandato como {str(m['cargo']).lower()}",
+                    f"{mes_ano(m['dt_inicio'])} a {mes_ano(m['dt_fim'])}",
+                    f"Fonte: {'Senado Federal' if m['casa'] == 'Senado Federal' else 'Câmara dos Deputados'}.",
+                ),
             )
         )
     for c in candidaturas_da_pessoa:
-        if c["ano_eleicao"] == r["ano_eleicao"] or str(c["resultado"] or "").lower().startswith("eleito"):
+        if c["ano_eleicao"] == r["ano_eleicao"]:
             continue
-        itens.append(
+        eleito = str(c["resultado"] or "").lower().startswith("eleito")
+        if eleito and c["cargo"] in ("Deputado federal", "Senador"):
+            continue  # o mandato na Câmara ou no Senado já vem dessas casas
+        if eleito:  # outros cargos: o TSE diz que foi eleito, e o mandato previsto é o da lei
+            duracao = 8 if c["cargo"] == "Senador" else 4
+            passado.append(
+                (
+                    c["ano_eleicao"] + 1,
+                    (
+                        "mandato",
+                        f"Eleito em {c['ano_eleicao']}",
+                        f"{c['cargo']}, mandato previsto de {c['ano_eleicao'] + 1} a {c['ano_eleicao'] + duracao}",
+                        "Fonte: TSE. O resultado da eleição não registra afastamentos.",
+                    ),
+                )
+            )
+            continue
+        passado.append(
             (
-                "candidatura",
-                f"Candidatura em {c['ano_eleicao']}",
-                f"{c['cargo']}, {str(c['resultado'] or 'resultado não informado').lower()}",
-                f"Pelo {c['partido']}." if c["partido"] else "",
+                c["ano_eleicao"],
+                (
+                    "candidatura",
+                    f"Candidatura em {c['ano_eleicao']}",
+                    f"{c['cargo']}, {str(c['resultado'] or 'resultado não informado').lower()}",
+                    f"Pelo {c['partido']}." if c["partido"] else "",
+                ),
             )
         )
+    itens += [item for _, item in sorted(passado, key=lambda x: -x[0])]
     if r["tipo_mandato"] == "novato":  # pessoa ligada, sem mandato anterior na casa
         sem_tempo, sem_tempo_nota = "Ainda não tomou posse", f"A posse é em {inicio}."
-    elif cargo in ("Deputado federal", "Senador"):
-        sem_tempo = "Histórico de mandatos não confirmado"
-        sem_tempo_nota = "Não ligamos esta pessoa a um mandato na Câmara ou no Senado. Isso não quer dizer que seja novata."
     else:
-        sem_tempo = "Histórico de mandatos não disponível"
-        sem_tempo_nota = "A base só tem os mandatos da Câmara e do Senado."
+        sem_tempo = "Histórico de mandatos não confirmado"
+        sem_tempo_nota = "Ainda não ligamos esta pessoa às eleições e aos mandatos anteriores. Isso não quer dizer que seja novata."
     tempo_no_cargo = (
         f'<p class="grande">{tempo(desde, hoje)}</p><small>Sem interrupção, desde {mes_ano(desde)}.</small>'
         if desde
@@ -465,7 +489,7 @@ def ficha(
         aviso_novato,
         f'<h2>Tempo no cargo e mandatos</h2><div class="card">{tempo_no_cargo}{linha_do_tempo(itens)}'
         '<p class="nota">Mandato exercido, mandato que vai começar e candidatura sem mandato aparecem com marcas diferentes. '
-        "Só temos o histórico de mandatos da Câmara e do Senado.</p></div>",
+        "Os mandatos da Câmara e do Senado vêm dessas casas; as eleições de outros cargos vêm do TSE e não registram afastamentos.</p></div>",
         f'<h2>A campanha de {r["ano_eleicao"]}</h2><div class="numeros">{campanha}</div>'
         '<p class="nota">Quando o dado não foi entregue ao TSE, mostramos Sem dado, nunca zero.</p>',
         f'<p class="nota">Fonte: <a href="{e(r["fonte_url"])}">TSE, candidaturas {r["ano_eleicao"]}</a>, capturado em {data_curta(r["dt_captura"])}. '
