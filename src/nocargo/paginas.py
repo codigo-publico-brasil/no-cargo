@@ -250,7 +250,7 @@ def cartao_de_pessoa(r: Row) -> str:
         f'<a class="card pessoa" href="../pessoa/{endereco(r["id_candidatura"])}.html" data-nome="{e(str(r["nome_urna"]).lower())}" '
         f'data-partido="{e(str(r["partido"]).lower())}" data-tipo="{e(r["tipo_mandato"] or "sem")}" '
         f'data-votos="{r["qtd_votos"] or 0}">{foto(r["foto_url"], r["nome_urna"], 60)}'
-        f'<span class="dados"><b>{e(r["nome_urna"])}</b><span>{detalhe}</span>{selo(r["tipo_mandato"])}</span>'
+        f'<span class="dados"><b>{e(r["nome_urna"])}</b><span>{detalhe}</span>{selo(r["tipo_mandato"], r["cargo"])}</span>'
         '<i aria-hidden="true">&#8250;</i></a>'
     )
 
@@ -430,7 +430,7 @@ def ficha(
     )
     aviso_novato = (
         '<div class="card destaque-novato">'
-        + selo("novato")
+        + selo("novato", cargo)
         + f"<p>Primeiro mandato {casa_do_cargo}."
         + (
             " Já exerceu mandato na outra casa do Congresso, como mostra a linha do tempo."
@@ -460,7 +460,7 @@ def ficha(
         f'<a class="voltar" href="../estado/{e(r["uf"])}.html">&larr; {e(UFS.get(r["uf"], (r["uf"],))[0])}</a>',
         f'<div class="cabeca">{foto(r["foto_url"], r["nome_urna"], 104)}<div><h1>{e(r["nome_urna"])}</h1>'
         f'<p>{e(cargo)} &middot; {e(r["uf"])}</p><p class="partido">Partido {e(r["partido"])}</p></div></div>'
-        f'<div class="selos">{selo(r["tipo_mandato"])}<span class="selo provisorio">Resultado provisório</span></div></section>',
+        f'<div class="selos">{selo(r["tipo_mandato"], cargo)}<span class="selo provisorio">Resultado provisório</span></div></section>',
         '<div class="secao">',
         aviso_novato,
         f'<h2>Tempo no cargo e mandatos</h2><div class="card">{tempo_no_cargo}{linha_do_tempo(itens)}'
