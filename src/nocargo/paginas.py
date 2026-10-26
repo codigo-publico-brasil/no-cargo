@@ -10,6 +10,7 @@ from nocargo.formato import (
     endereco,
     faixa,
     foto,
+    hemiciclo,
     mes_ano,
     numero,
     percentual,
@@ -98,8 +99,14 @@ def em_construcao(titulo: str, texto: str) -> str:
 
 
 def casa(
-    titulo: str, subtitulo: str, partidos: Counter[str], pendentes: int = 0, selos: Counter[str] | None = None
+    titulo: str,
+    subtitulo: str,
+    partidos: Counter[str],
+    pendentes: int = 0,
+    selos: Counter[str] | None = None,
+    rotulo: str | None = None,
 ) -> str:
+    """Casa legislativa: meia-lua com uma bolinha por cadeira (`rotulo` no centro). Sem `rotulo`, barra de 100%."""
     chips = ""
     if selos:
         chips = (
@@ -112,7 +119,7 @@ def casa(
         )
     return (
         f'<div class="card casa"><h3>{e(titulo)}</h3><p class="sub">{e(subtitulo)}</p>'
-        f"{faixa(dict(partidos), pendentes)}{chips}</div>"
+        f"{hemiciclo(dict(partidos), rotulo) if rotulo else faixa(dict(partidos), pendentes)}{chips}</div>"
     )
 
 
@@ -165,6 +172,7 @@ def brasil(ano: int, eleitos: list[Row], situacao: list[Row], capturado: date | 
             contar(eleitos, ("Deputado federal",)),
             0,
             selos_dep,
+            "deputados",
         ),
         casa(
             "Senado Federal",
@@ -172,12 +180,14 @@ def brasil(ano: int, eleitos: list[Row], situacao: list[Row], capturado: date | 
             contar(eleitos, ("Senador",)),
             0,
             selos_sen,
+            "senadores",
         ),
         esfera("Estadual", "Capitais dos estados"),
         casa(
             "Assembleias Legislativas e Câmara Legislativa",
             f"{sum(legislativo_estadual.values())} eleitos em {ano}",
             legislativo_estadual,
+            rotulo="deputados",
         ),
         esfera("Municipal", "5.570 cidades"),
         em_construcao("Câmaras de vereadores", "Quem faz as leis de cada cidade."),
@@ -299,6 +309,7 @@ def estado(uf: str, ano: int, eleitos: list[Row], situacao: list[Row], capturado
             "Bancada federal por partido",
             f"{len(deputados)} cadeiras de {nome}",
             contar(doestado, ("Deputado federal",)),
+            rotulo="deputados",
         ),
         lista_filtravel(deputados, True),
         esfera("Estadual", "Assembleia Legislativa"),
@@ -307,6 +318,7 @@ def estado(uf: str, ano: int, eleitos: list[Row], situacao: list[Row], capturado
             "Assembleia por partido",
             f"{len(estaduais)} cadeiras de {nome}",
             contar(doestado, ("Deputado estadual", "Deputado distrital")),
+            rotulo="deputados",
         ),
         lista_filtravel(estaduais, False),
         esfera("Municipal", "Cidades do estado"),

@@ -1,13 +1,13 @@
 """Formatação de datas, valores e blocos HTML pequenos, iguais em todas as páginas."""
 
+import math
 from datetime import date
 from html import escape
 
+from nocargo.cores import SEM_COR, cor_do_partido
+
 MESES = ["jan.", "fev.", "mar.", "abr.", "mai.", "jun.", "jul.", "ago.", "set.", "out.", "nov.", "dez."]
 
-# Cores só separam os grupos da faixa de partidos: seguem a posição (1º, 2º...) e nunca identificam um partido.
-CORES_DA_FAIXA = ("#6250d6", "#1baf7a", "#e34948", "#008300", "#e87ba4")
-COR_OUTROS = "#9AA5B1"
 LISTRADO = "repeating-linear-gradient(45deg,#9AA5B1 0 4px,#E3E9F0 4px 8px)"
 
 SELOS = {
@@ -88,29 +88,100 @@ def foto(url: str | None, nome: str, tamanho: int = 64) -> str:
     )
 
 
-def faixa(contagens: dict[str, int], pendentes: int = 0) -> str:
-    """Uma barra de 100% com os cinco partidos de mais cadeiras, o resto em Outros, e a legenda com nome e número.
-
-    Do maior para o menor, em qualquer casa. As cores seguem a posição na barra e não identificam partido.
-    """
-    total = sum(contagens.values()) + pendentes
-    if total == 0:
-        return '<p class="nota">Sem eleitos registrados.</p>'
+def _grupos(contagens: dict[str, int], pendentes: int = 0) -> list[tuple[str, int, str]]:
+    """Os partidos do maior para o menor número de cadeiras, cada um com a sua cor de marca (cinza se a fonte não tem)."""
     ordem = sorted(contagens.items(), key=lambda kv: (-kv[1], kv[0]))
-    grupos = [(nome, qtd, CORES_DA_FAIXA[i]) for i, (nome, qtd) in enumerate(ordem[:5])]
-    resto = sum(qtd for _, qtd in ordem[5:])
-    if resto:
-        grupos.append(("Outros partidos", resto, COR_OUTROS))
+    grupos = [(nome, qtd, cor_do_partido(nome) or SEM_COR) for nome, qtd in ordem]
     if pendentes:
         grupos.append(("Aguardando 2º turno", pendentes, LISTRADO))
-    descricao = ", ".join(f"{nome} {qtd}" for nome, qtd, _ in grupos)
-    segmentos = "".join(f'<span style="flex:{qtd} 1 0;background:{cor}"></span>' for _, qtd, cor in grupos)
-    legenda = "".join(
-        f'<li><span class="ponto" style="background:{cor}"></span><span class="nome">{e(nome)}</span>'
-        f'<b>{numero(qtd)}</b><span class="pct">{round(100 * qtd / total)}%</span></li>'
-        for nome, qtd, cor in grupos
+    return grupos
+
+
+def _legenda(grupos: list[tuple[str, int, str]], total: int) -> str:
+    itens = "".join(
+        f'<li tabindex="0" data-grupo="{i}"><span class="ponto" style="background:{cor}"></span>'
+        f'<span class="nome">{e(nome)}</span><b>{numero(qtd)}</b><span class="pct">{round(100 * qtd / total)}%</span></li>'
+        for i, (nome, qtd, cor) in enumerate(grupos)
+    )
+    return f'<ul class="legenda">{itens}</ul>'
+
+
+def _nota_das_cores(grupos: list[tuple[str, int, str]]) -> str:
+    sem_cor = (
+        "; cinza é partido sem cor registrada na fonte" if any(cor == SEM_COR for _, _, cor in grupos) else ""
     )
     return (
-        f'<div class="faixa" role="img" aria-label="{e(descricao)}">{segmentos}</div><ul class="legenda">{legenda}</ul>'
-        '<p class="nota">Do partido com mais cadeiras para o com menos. As cores só separam os grupos e não indicam partido.</p>'
+        '<p class="nota">Do partido com mais cadeiras para o com menos, não por posição política. '
+        f"Cada partido usa a sua cor de marca{sem_cor}.</p>"
+    )
+
+
+def faixa(contagens: dict[str, int], pendentes: int = 0) -> str:
+    """Uma barra de 100% com cada partido na sua cor, do maior para o menor, e a legenda com nome e número."""
+    grupos = _grupos(contagens, pendentes)
+    total = sum(qtd for _, qtd, _ in grupos)
+    if total == 0:
+        return '<p class="nota">Sem eleitos registrados.</p>'
+    descricao = ", ".join(f"{nome} {qtd}" for nome, qtd, _ in grupos)
+    segmentos = "".join(f'<span style="flex:{qtd} 1 0;background:{cor}"></span>' for _, qtd, cor in grupos)
+    return (
+        f'<div class="faixa" role="img" aria-label="{e(descricao)}">{segmentos}</div>'
+        f"{_legenda(grupos, total)}{_nota_das_cores(grupos)}"
+    )
+
+
+RAIO_MAXIMO = 7  # raio máximo da bolinha: poucas cadeiras não podem virar bolas gigantes
+FOLGA = 2
+
+
+def _fileiras(total: int) -> int:
+    return max(2, min(18, round(math.sqrt(total) / 1.9)))
+
+
+def _cadeiras(total: int) -> tuple[list[tuple[float, float]], float]:
+    """Posição (ângulo, raio de 0 a 1) de cada cadeira em fileiras concêntricas, da esquerda para a direita.
+
+    Devolve também o menor passo entre duas cadeiras vizinhas (na mesma escala), que limita o tamanho da bolinha.
+    """
+    fileiras = _fileiras(total)
+    raios = [0.42 + 0.58 * i / (fileiras - 1) for i in range(fileiras)]
+    por_fileira = [round(total * r / sum(raios)) for r in raios]
+    por_fileira[-1] += total - sum(por_fileira)
+    passo = 0.58 / (fileiras - 1)
+    cadeiras = []
+    for raio, n in zip(raios, por_fileira, strict=True):
+        if n > 1:
+            passo = min(passo, math.pi * raio / (n - 1))
+        for j in range(n):
+            cadeiras.append((math.pi * (1 - j / (n - 1)) if n > 1 else math.pi / 2, raio))
+    return sorted(cadeiras, key=lambda c: (-c[0], c[1])), passo
+
+
+def hemiciclo(contagens: dict[str, int], rotulo: str) -> str:
+    """Uma bolinha por cadeira, em meia-lua, com o total no centro e a legenda com nome e número.
+
+    Os partidos entram do maior para o menor, nunca por posição política, e as cores só separam os grupos.
+    """
+    total = sum(contagens.values())
+    if total == 0:
+        return '<p class="nota">Sem eleitos registrados.</p>'
+    grupos = _grupos(contagens)
+    dono = [i for i, (_, qtd, _) in enumerate(grupos) for _ in range(qtd)]
+    cadeiras, passo = _cadeiras(total)
+    r = round(min(RAIO_MAXIMO, 0.42 * passo * 100), 2)  # a bolinha nunca encosta na vizinha
+    fora = 110 - r - FOLGA  # raio da fileira de fora: a bolinha inteira fica dentro do desenho
+    cy = r + fora + FOLGA
+    altura = round(cy + r + FOLGA, 2)
+    bolas = "".join(
+        f'<circle class="g{g}" cx="{round(110 + fora * raio * math.cos(ang), 2)}" '
+        f'cy="{round(cy - fora * raio * math.sin(ang), 2)}" r="{r}" fill="{grupos[g][2]}" stroke="#16202B" stroke-opacity=".2" stroke-width=".4"/>'
+        for (ang, raio), g in zip(cadeiras, dono, strict=True)
+    )
+    tamanho_total = 24 if len(numero(total)) <= 3 else 17  # o número precisa caber no vazio do meio
+    descricao = ", ".join(f"{nome} {qtd}" for nome, qtd, _ in grupos)
+    return (
+        f'<div class="hemiciclo"><svg viewBox="0 0 220 {altura}" role="img" aria-label="{e(rotulo)}: {e(descricao)}">{bolas}'
+        f'<text x="110" y="{round(cy - 12, 2)}" text-anchor="middle" class="total" style="font-size:{tamanho_total}px">{numero(total)}</text>'
+        f'<text x="110" y="{round(cy - 3, 2)}" text-anchor="middle" class="rotulo">{e(rotulo)}</text></svg>'
+        f"{_legenda(grupos, total)}</div>" + _nota_das_cores(grupos)
     )
