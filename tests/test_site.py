@@ -5,6 +5,7 @@ from pathlib import Path
 from nocargo import cores, dados, formato
 from nocargo.__main__ import construir
 from nocargo.cores import SEM_COR
+from nocargo.paginas import FONTES, REPO, SITE_MAE
 
 HOJE = date(2026, 10, 25)
 
@@ -199,9 +200,20 @@ def test_names_are_escaped_and_pages_load_nothing_from_other_sites(warehouse, tm
     saida = site(warehouse, tmp_path)
     pagina = texto(saida, "estado/RJ.html")
     assert "<b>Carla</b>" not in pagina and "&lt;b&gt;Carla&lt;/b&gt; Teste" in pagina
+    permitidos = {SITE_MAE, REPO, *(url for _, url in FONTES)}
     for caminho in saida.rglob("*.html"):
         externos = re.findall(r'(?:src|href)="(https?://[^"]+)"', caminho.read_text(encoding="utf-8"))
-        assert all("dadosabertos.tse.jus.br" in u or "exemplo.gov.br" in u for u in externos), caminho
+        assert all(
+            u in permitidos or "dadosabertos.tse.jus.br" in u or "exemplo.gov.br" in u for u in externos
+        ), caminho
+    for arquivo in (saida / "style.css", saida / "tokens.css"):
+        assert "http" not in re.sub(r"/\*.*?\*/", "", arquivo.read_text(encoding="utf-8"), flags=re.S), (
+            arquivo
+        )
+    assert all(
+        (saida / "fonts" / f).stat().st_size > 1000
+        for f in ("fraunces.woff2", "inter.woff2", "jetbrains-mono.woff2")
+    )
 
 
 def test_time_in_office_counts_a_chain_of_mandates_and_stops_at_a_gap(warehouse):
@@ -240,3 +252,48 @@ def test_a_win_for_another_office_appears_as_a_mandate_from_the_election_result(
     assert pagina.index("Eleito em 2014") > pagina.index(
         "Candidatura em 2018"
     )  # do mais recente para o mais antigo
+
+
+def test_header_has_one_home_link_the_repo_and_the_project_symbol(warehouse, tmp_path):
+    saida = site(warehouse, tmp_path)
+    for caminho in ("index.html", "estado/RJ.html", "cargos.html"):
+        pagina = texto(saida, caminho)
+        topo = pagina[pagina.index('<header class="topo">') : pagina.index("</header>")]
+        assert topo.count('class="marca"') == 1 and "no-cargo.svg" in topo and REPO in topo
+    assert (saida / "no-cargo.svg").exists()
+    assert (
+        'data-theme="light"' in texto(saida, "index.html") and "Código Público Brasil" not in topo
+    )  # só tema claro; o nome da organização fica no rodapé
+
+
+def test_state_page_collapses_long_lists_and_links_to_the_three_powers(warehouse, tmp_path):
+    pagina = texto(site(warehouse, tmp_path), "estado/RJ.html")
+    assert (
+        pagina.count('<details class="recolhivel">') == 2 and '<details class="recolhivel" open' not in pagina
+    )
+    for n in "123":
+        assert f'href="#poder-{n}"' in pagina and f'id="poder-{n}"' in pagina
+
+
+def test_state_and_person_pages_say_where_you_are_and_link_back(warehouse, tmp_path):
+    saida = site(warehouse, tmp_path)
+    estado = texto(saida, "estado/RJ.html")
+    assert 'aria-label="Você está em"' in estado and 'href="../index.html">Brasil</a>' in estado
+    assert "<h1>Rio de Janeiro</h1>" in estado and "Estado · RJ" in estado
+    pessoa = next((saida / "pessoa").glob("*.html")).read_text(encoding="utf-8")
+    assert (
+        'aria-label="Você está em"' in pessoa
+        and 'href="../index.html">Brasil</a>' in pessoa
+        and "../estado/" in pessoa
+    )
+
+
+def test_powers_are_section_headings_and_the_css_has_no_heavy_borders(warehouse, tmp_path):
+    saida = site(warehouse, tmp_path)
+    brasil = texto(saida, "index.html")
+    assert brasil.count('class="poder"') == 3 and "<h2>Poder Executivo</h2>" in brasil
+    css = texto(saida, "style.css")
+    assert not re.search(
+        r"border[a-z-]*:[^;}]*\b[2-9]px (solid|dashed)",
+        css.replace("3px dashed", "").replace("3px solid", ""),
+    )

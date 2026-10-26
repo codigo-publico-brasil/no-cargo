@@ -1,0 +1,45 @@
+/* Tokens de design do Código Público Brasil.
+   Fonte única de cores e fontes: o site e as aplicações importam este arquivo.
+   Documentação: /identidade/ */
+:root {
+  --bg: #f6f3ea;
+  --surface: #fffdf8;
+  --ink: #0f1f1a;
+  --muted: #55645d;
+  --line: #d9d3c2;
+  --green: #0b5d3b;
+  --green-ink: #0b5d3b;
+  --blue: #1b3a8a;
+  --brand-blue: #1b3a8a; /* o azul da marca, igual nos dois temas (--blue clareia no escuro) */
+  --yellow: #f2c230;
+  --hero-bg: #0c1f18;
+  --hero-ink: #f6f3ea;
+  --hero-muted: #a9bdb2;
+  --serif: "Fraunces", Georgia, "Times New Roman", serif;
+  --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+
+/* Tema escuro: automático pelo sistema, ou escolhido com data-theme="dark" (o botão do site). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c1511;
+    --surface: #121f19;
+    --ink: #eee9da;
+    --muted: #9fb2a8;
+    --line: #26372e;
+    --green-ink: #5fd39a;
+    --blue: #8fa8ff;
+    --hero-bg: #08110d;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c1511;
+  --surface: #121f19;
+  --ink: #eee9da;
+  --muted: #9fb2a8;
+  --line: #26372e;
+  --green-ink: #5fd39a;
+  --blue: #8fa8ff;
+  --hero-bg: #08110d;
+}

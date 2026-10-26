@@ -10,6 +10,7 @@ carregando dados, a geração falha até ela terminar.
 
 import argparse
 import os
+import shutil
 from datetime import date
 from pathlib import Path
 
@@ -36,8 +37,7 @@ def construir(con: dados.Connection, saida: Path, hoje: date | None = None) -> i
     situacao = dados.situacao_dos_cargos(con, ano)
     capturado = max((r["dt_captura"] for r in situacao if r["dt_captura"]), default=None)
     saida.mkdir(parents=True, exist_ok=True)
-    for arquivo in ESTATICOS.iterdir():
-        escrever(saida / arquivo.name, arquivo.read_text(encoding="utf-8"))
+    shutil.copytree(ESTATICOS, saida, dirs_exist_ok=True)  # css, js, símbolo e fontes (arquivos binários)
     escrever(saida / "index.html", paginas.brasil(ano, eleitos, situacao, capturado))
     escrever(saida / "cargos.html", textos.cargos())
     escrever(saida / "como-calculamos.html", textos.como_calculamos())

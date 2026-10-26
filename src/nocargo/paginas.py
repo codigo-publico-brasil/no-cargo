@@ -41,27 +41,42 @@ PODERES = (
      "Quem ocupa: ministros, desembargadores e juízes. Não são eleitos: são nomeados ou entram por concurso."),
 )  # fmt: skip
 
-NAV = (("brasil", "Brasil", "index.html"), ("cargos", "Entenda os cargos", "cargos.html"),
-       ("como", "Como calculamos", "como-calculamos.html"))  # fmt: skip
+NAV = (("cargos", "Cargos", "cargos.html"), ("como", "Método", "como-calculamos.html"))
+SITE_MAE = "https://codigo-publico-brasil.github.io"
+REPO = "https://github.com/codigo-publico-brasil/nocargo"
+FONTES = (
+    ("TSE", "https://dadosabertos.tse.jus.br"),
+    ("Câmara", "https://dadosabertos.camara.leg.br"),
+    ("Senado", "https://www12.senado.leg.br/dados-abertos"),
+)
 
 
 def pagina(titulo: str, corpo: str, ativa: str, raiz: str = "", descricao: str = "") -> str:
-    menu = "".join(
-        f'<a href="{raiz}{href}"{' aria-current="page"' if chave == ativa else ""}>{nome}</a>'
-        for chave, nome, href in NAV
+    menu = (
+        "".join(
+            f'<a href="{raiz}{href}"{' aria-current="page"' if chave == ativa else ""}>{nome}</a>'
+            for chave, nome, href in NAV
+        )
+        + f'<a class="repo" href="{REPO}">GitHub &#8599;</a>'
     )
+    fontes = " &middot; ".join(f'<a href="{url}">{nome}</a>' for nome, url in FONTES)
     return (
-        '<!doctype html>\n<html lang="pt-BR">\n<head>\n<meta charset="utf-8">\n'
+        '<!doctype html>\n<html lang="pt-BR" data-theme="light">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         f"<title>{e(titulo)} | No Cargo</title>\n"
         f'<meta name="description" content="{e(descricao or "Quem ocupa o poder no Brasil, pelos três poderes, com a fonte oficial ao lado.")}">\n'
-        f'<link rel="stylesheet" href="{raiz}style.css">\n</head>\n<body>\n'
-        '<header class="topo"><div class="marca"><span class="logo" aria-hidden="true">&#10003;</span>'
-        f'<a href="{raiz}index.html">No Cargo</a></div><nav aria-label="Principal">{menu}</nav></header>\n'
+        f'<link rel="icon" href="{raiz}no-cargo.svg" type="image/svg+xml">\n'
+        f'<link rel="stylesheet" href="{raiz}tokens.css">\n<link rel="stylesheet" href="{raiz}style.css">\n</head>\n<body>\n'
+        f'<header class="topo"><div class="miolo"><a class="marca" href="{raiz}index.html" aria-label="No Cargo, página inicial">'
+        f'<img src="{raiz}no-cargo.svg" alt="" width="32" height="32">'
+        '<span class="marca-nome">No Cargo</span></a>'
+        f'<nav aria-label="Principal">{menu}</nav></div></header>\n<div class="faixa-cores"></div>\n'
         f"<main>\n{corpo}\n</main>\n"
-        '<footer class="rodape"><b>No Cargo</b><p>Dados do TSE, da Câmara dos Deputados e do Senado Federal. '
-        "Uma iniciativa Código Público Brasil.</p>"
-        f'<a href="{raiz}como-calculamos.html">Como calculamos e de onde vêm os dados</a></footer>\n'
+        '<footer class="rodape"><div><b>No Cargo</b>'
+        f'<p>Um projeto do <a href="{SITE_MAE}">Código Público Brasil</a>. Código sob AGPL-3.0; dados curados sob CC BY 4.0.</p>'
+        f"<p>Dados oficiais: {fontes}.</p>"
+        f'<p class="links"><a href="{raiz}index.html">Início</a><a href="{raiz}cargos.html">Entenda os cargos</a><a href="{raiz}como-calculamos.html">Como calculamos e de onde vêm os dados</a>'
+        f'<a href="{REPO}">Código no GitHub &#8599;</a></p></div></footer>\n'
         f'<script src="{raiz}app.js" defer></script>\n</body>\n</html>\n'
     )
 
@@ -70,6 +85,19 @@ def faixa_de_titulo(chave: str, titulo: str, subtitulo: str, extra: str = "") ->
     return (
         f'<section class="heroi"><span class="sobretitulo">{e(chave)}</span><h1>{e(titulo)}</h1>'
         f"<p>{e(subtitulo)}</p>{extra}</section>"
+    )
+
+
+def migalhas(itens: list[tuple[str, str | None]]) -> str:
+    """Onde a pessoa está e como voltar: `(nome, link)`; o último item, sem link, é a página atual."""
+    partes = [
+        f'<a href="{e(link)}">{e(nome)}</a>' if link else f'<span aria-current="page">{e(nome)}</span>'
+        for nome, link in itens
+    ]
+    return (
+        '<nav class="migalhas" aria-label="Você está em">'
+        + '<span aria-hidden="true">/</span>'.join(partes)
+        + "</nav>"
     )
 
 
@@ -82,7 +110,7 @@ def aviso_provisorio(capturado: date | None) -> str:
 
 def banda(numero_: str, nome: str, descricao: str, quem: str = "") -> str:
     return (
-        f'<div class="poder"><div class="poder-nome"><span class="poder-num">{numero_}</span><h2>{e(nome)}</h2></div>'
+        f'<div class="poder" id="poder-{numero_}"><div class="poder-nome"><span class="poder-num">{numero_}</span><h2>{e(nome)}</h2></div>'
         f"<p>{e(descricao)}</p>" + (f'<p class="quem">{e(quem)}</p>' if quem else "") + "</div>"
     )
 
@@ -266,7 +294,7 @@ def botoes_de_tipo(eleitos: list[Row]) -> str:
     )
 
 
-def lista_filtravel(eleitos: list[Row], com_selos: bool) -> str:
+def lista_filtravel(eleitos: list[Row], com_selos: bool, titulo: str) -> str:
     controles = (
         '<div class="card controles"><label class="so-leitor" for="busca">Buscar por nome ou partido</label>'
         '<input id="busca" type="search" placeholder="Buscar por nome ou partido" autocomplete="off">'
@@ -286,9 +314,10 @@ def lista_filtravel(eleitos: list[Row], com_selos: bool) -> str:
         '<p class="contagem" aria-live="polite"></p></div>'
     )
     return (
+        f'<details class="recolhivel"><summary>{e(titulo)} ({len(eleitos)}): buscar e ver a lista</summary>'
         f'<div class="lista" data-filtravel>{controles}<div class="itens">'
         + "".join(cartao_de_pessoa(r) for r in eleitos)
-        + "</div></div>"
+        + "</div></div></details>"
     )
 
 
@@ -306,12 +335,16 @@ def estado(uf: str, ano: int, eleitos: list[Row], situacao: list[Row], capturado
     deputados = por_cargo["Deputado federal"]
     estaduais = [*por_cargo["Deputado estadual"], *por_cargo["Deputado distrital"]]
     corpo = [
+        migalhas([("Brasil", "../index.html"), (nome, None)]),
         faixa_de_titulo(
-            "Estado",
-            f"Quem está no cargo em {nome}",
-            f"Os três poderes no estado. Mostramos os eleitos em {ano}, que assumem em {ano + 1}.",
+            f"Estado · {uf}",
+            nome,
+            f"Quem está no cargo. Mostramos os eleitos em {ano}, que assumem em {ano + 1}.",
             aviso_provisorio(capturado),
         ),
+        '<nav class="indice" aria-label="Nesta página">'
+        + "".join(f'<a href="#poder-{n}">{nome}</a>' for n, nome, *_ in PODERES)
+        + "</nav>",
         '<div class="secao">',
         banda(*PODERES[0][:3]),
         esfera("Estadual", "No estado"),
@@ -331,7 +364,7 @@ def estado(uf: str, ano: int, eleitos: list[Row], situacao: list[Row], capturado
             contar(doestado, ("Deputado federal",)),
             rotulo="deputados",
         ),
-        lista_filtravel(deputados, True),
+        lista_filtravel(deputados, True, "Deputados federais"),
         esfera("Estadual", "Assembleia Legislativa"),
         f"<h3>Deputados estaduais e distritais ({len(estaduais)})</h3>",
         casa(
@@ -340,7 +373,7 @@ def estado(uf: str, ano: int, eleitos: list[Row], situacao: list[Row], capturado
             contar(doestado, ("Deputado estadual", "Deputado distrital")),
             rotulo="deputados",
         ),
-        lista_filtravel(estaduais, False),
+        lista_filtravel(estaduais, False, "Deputados estaduais e distritais"),
         esfera("Municipal", "Cidades do estado"),
         em_construcao("Vereadores", "Os eleitos de cada cidade do estado."),
         banda(*PODERES[2][:3]),
@@ -355,7 +388,7 @@ def estado(uf: str, ano: int, eleitos: list[Row], situacao: list[Row], capturado
     return pagina(
         f"Quem está no cargo em {nome}",
         "\n".join(corpo),
-        "brasil",
+        "",
         raiz="../",
         descricao=f"Os eleitos de {nome} em {ano}, pelos três poderes.",
     )
@@ -409,7 +442,7 @@ def ficha(
         if c["ano_eleicao"] == r["ano_eleicao"]:
             continue
         eleito = str(c["resultado"] or "").lower().startswith("eleito")
-        if eleito and c["cargo"] in ("Deputado federal", "Senador"):
+        if eleito and c["cargo"] in ("Deputado federal", "Senador") and mandatos_da_pessoa:
             continue  # o mandato na Câmara ou no Senado já vem dessas casas
         if eleito:  # outros cargos: o TSE diz que foi eleito, e o mandato previsto é o da lei
             duracao = 8 if c["cargo"] == "Senador" else 4
@@ -437,8 +470,12 @@ def ficha(
             )
         )
     itens += [item for _, item in sorted(passado, key=lambda x: -x[0])]
+    ja_eleito = any(str(c["resultado"] or "").lower().startswith("eleito") for c in candidaturas_da_pessoa)
     if r["tipo_mandato"] == "novato":  # pessoa ligada, sem mandato anterior na casa
         sem_tempo, sem_tempo_nota = "Ainda não tomou posse", f"A posse é em {inicio}."
+    elif ja_eleito:
+        sem_tempo = "Já foi eleito antes"
+        sem_tempo_nota = "Pelas eleições do TSE, ligadas por nome e data de nascimento. O resultado da eleição não registra afastamentos."
     else:
         sem_tempo = "Histórico de mandatos não confirmado"
         sem_tempo_nota = "Ainda não ligamos esta pessoa às eleições e aos mandatos anteriores. Isso não quer dizer que seja novata."
@@ -480,8 +517,14 @@ def ficha(
         )
     )
     corpo = [
+        migalhas(
+            [
+                ("Brasil", "../index.html"),
+                (UFS.get(r["uf"], (r["uf"],))[0], f"../estado/{r['uf']}.html"),
+                (str(r["nome_urna"]), None),
+            ]
+        ),
         '<section class="heroi ficha">',
-        f'<a class="voltar" href="../estado/{e(r["uf"])}.html">&larr; {e(UFS.get(r["uf"], (r["uf"],))[0])}</a>',
         f'<div class="cabeca">{foto(r["foto_url"], r["nome_urna"], 104)}<div><h1>{e(r["nome_urna"])}</h1>'
         f'<p>{e(cargo)} &middot; {e(r["uf"])}</p><p class="partido">Partido {e(r["partido"])}</p></div></div>'
         f'<div class="selos">{selo(r["tipo_mandato"], cargo)}<span class="selo provisorio">Resultado provisório</span></div></section>',
