@@ -289,7 +289,7 @@ def estado(uf: str, ano: int, eleitos: list[Row], situacao: list[Row], capturado
         faixa_de_titulo(
             "Estado",
             f"Quem está no cargo em {nome}",
-            f"Os três poderes no estado. Mostramos os eleitos em {ano}, que assumem em {mes_ano(next((r['dt_posse'] for r in doestado if r['dt_posse']), None))}.",
+            f"Os três poderes no estado. Mostramos os eleitos em {ano}, que assumem em {ano + 1}.",
             aviso_provisorio(capturado),
         ),
         '<div class="secao">',
@@ -358,18 +358,17 @@ def ficha(
 ) -> str:
     cargo = r["cargo"]
     anos = 8 if cargo == "Senador" else 4
-    posse = r["dt_posse"]
-    itens: list[tuple[str, str, str, str]] = []
-    if posse:
-        fim = date(posse.year + anos, posse.month, posse.day)
-        itens.append(
-            (
-                "proximo",
-                "Próximo mandato",
-                f"{mes_ano(posse)} a {mes_ano(fim)} ({anos} anos)",
-                f"Eleito em {r['ano_eleicao']}, resultado provisório.",
-            )
+    inicio = (
+        r["ano_eleicao"] + 1
+    )  # a posse é no início do ano seguinte; a data exata não vem de fonte confiável
+    itens: list[tuple[str, str, str, str]] = [
+        (
+            "proximo",
+            "Próximo mandato",
+            f"A partir de {inicio}, por {anos} anos",
+            f"Termina no início de {inicio + anos}. Eleito em {r['ano_eleicao']}, resultado provisório.",
         )
+    ]
     for m in mandatos_da_pessoa:
         em_curso = m["dt_fim"] is None or m["dt_fim"] >= hoje
         itens.append(
@@ -394,8 +393,7 @@ def ficha(
     tempo_no_cargo = (
         f'<p class="grande">{tempo(desde, hoje)}</p><small>Sem interrupção, desde {mes_ano(desde)}.</small>'
         if desde
-        else '<p class="grande cinza">Ainda não tomou posse</p>'
-        f"<small>{'A posse é em ' + mes_ano(posse) + '.' if posse else ''}</small>"
+        else f'<p class="grande cinza">Ainda não tomou posse</p><small>A posse é em {inicio}.</small>'
     )
     aviso_novato = (
         '<div class="card destaque-novato">'
