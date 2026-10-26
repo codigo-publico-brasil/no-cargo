@@ -38,9 +38,14 @@ Antes de abrir um PR:
 uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest
 ```
 
+## Publicar
+
+Ver [docs/publicacao.md](docs/publicacao.md).
+
 ## Como é feito
 
 - `src/nocargo/dados.py`: consultas ao esquema `marts` (somente leitura).
 - `src/nocargo/paginas.py` e `textos.py`: as páginas, como texto HTML, sem motor de templates.
+- `src/nocargo/seo.py`: canônico, compartilhamento, dados estruturados, robots, sitemap e llms.txt.
 - `src/nocargo/static/`: `style.css` (mobile primeiro) e `app.js` (filtro e ordem das listas).
 - `tests/`: um warehouse pequeno, inventado, com o esquema `marts`.

@@ -1,5 +1,6 @@
 """Páginas de texto: o que cada cargo faz e como os dados são tratados. Escritas à mão, iguais para todos os partidos."""
 
+from nocargo import seo
 from nocargo.paginas import PODERES, banda, em_construcao, esfera, faixa_de_titulo, pagina
 
 CARGOS = (
@@ -59,7 +60,13 @@ def cargos() -> str:
         '<p class="nota">Fonte: Constituição Federal, artigos 27, 28, 44 a 46, 77 e 82.</p>',
         "</div>",
     ]
-    return pagina("Entenda os cargos", "\n".join(corpo), "cargos")
+    return pagina(
+        "Entenda os cargos",
+        "\n".join(corpo),
+        "cargos",
+        descricao="O que faz cada cargo eleito no Brasil (presidente, governador, senador, deputados), em palavras simples.",
+        caminho="cargos.html",
+    )
 
 
 def como_calculamos() -> str:
@@ -88,7 +95,15 @@ def como_calculamos() -> str:
         "<li>Os selos Novato, Reeleito e Retorno são iguais para todos os partidos.</li>"
         "<li>Cada partido aparece na sua cor de marca, registrada no Wikidata. Partido sem cor registrada aparece em cinza, e nenhuma cor é inventada. A ordem é sempre do maior para o menor número de cadeiras.</li>"
         "<li>Só dados públicos e oficiais, sem CPF, endereço ou telefone. Sem antecedentes, processos ou palavras de opinião.</li></ul>"
-        "<h2>Encontrou um erro?</h2><p>Diga qual página e qual dado, com o link da fonte. Corrigimos o que estiver errado, mostrando a data da correção.</p>"
+        "<h2>De onde vêm as fotos</h2><p>As fotos vêm direto dos sites da Câmara dos Deputados e do Senado Federal: o seu navegador as busca nesses sites, que podem registrar o acesso (não informamos de qual página você vem). Quem não tem foto na fonte aparece com um desenho.</p>"
+        "<h2>Encontrou um erro?</h2><p>Abra uma issue pública com a página, o dado e o link da fonte oficial: o repositório é o canal de correção. Corrigimos o que estiver errado, mostrando a data da correção.</p>"
+        f'<p><a href="{seo.link_de_correcao("Como calculamos", "como-calculamos.html")}">Abrir uma issue de correção &#8599;</a></p>'
         "</div>",
     ]
-    return pagina("Como calculamos", "\n".join(corpo), "como")
+    return pagina(
+        "Como calculamos",
+        "\n".join(corpo),
+        "como",
+        descricao="De onde vêm os dados do No Cargo, como as pessoas são ligadas entre eleições e o que ainda não sabemos.",
+        caminho="como-calculamos.html",
+    )
