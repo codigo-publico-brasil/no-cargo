@@ -81,14 +81,15 @@ def warehouse(tmp_path) -> Iterator[duckdb.DuckDBPyConnection]:
     con.execute(
         "INSERT INTO marts.candidaturas VALUES (10, 2022, 1, 'RJ', 'Deputado federal', 'Partido A', 'Eleito por qp', ?),"
         " (10, 2026, 1, 'RJ', 'Deputado federal', 'Partido A', 'Eleito por qp', ?),"
-        " (12, 2018, 1, 'RJ', 'Deputado estadual', 'Partido C', 'Não eleito', ?)",
-        (CAPTURA, CAPTURA, CAPTURA),
+        " (12, 2018, 1, 'RJ', 'Deputado estadual', 'Partido C', 'Não eleito', ?),"
+        " (10, 2018, 1, 'RJ', 'Governador', 'Partido A', '2º turno', ?),"
+        " (10, 2018, 2, 'RJ', 'Governador', 'Partido A', 'Não eleito', ?)",
+        (CAPTURA, CAPTURA, CAPTURA, CAPTURA, CAPTURA),
     )
     con.execute(
-        "INSERT INTO marts.mandatos VALUES (10, 'Câmara dos Deputados', 'Deputado federal', 'RJ', ?, ?, ?, ?),"
-        " (10, 'Câmara dos Deputados', 'Deputado federal', 'RJ', ?, ?, ?, ?)",
-        (date(2019, 2, 1), date(2023, 1, 31), date(2019, 2, 1), date(2023, 1, 31),
-         date(2023, 2, 1), date(2027, 1, 31), date(2023, 2, 1), date(2027, 1, 31)),
-    )  # fmt: skip
+        "INSERT INTO marts.mandatos VALUES (10, 'Câmara dos Deputados', 'Deputado federal', 'RJ', NULL, NULL, ?, ?),"
+        " (10, 'Câmara dos Deputados', 'Deputado federal', 'RJ', NULL, NULL, ?, ?)",
+        (date(2019, 2, 1), date(2023, 1, 31), date(2023, 2, 1), date(2027, 1, 31)),
+    )  # como no banco real: só a legislatura tem data
     yield con
     con.close()

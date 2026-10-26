@@ -122,9 +122,39 @@ def test_district_deputies_are_shown_with_the_state_ones(warehouse, tmp_path):
 def test_profile_shows_time_in_office_timeline_and_the_campaign_totals(warehouse, tmp_path):
     pagina = texto(site(warehouse, tmp_path), "pessoa/2026-RJ-1.html")
     assert "7 anos e 8 meses" in pagina  # desde 1º de fev. de 2019 até 25/10/2026, sem interrupção
-    assert "Próximo mandato" in pagina and "Mandato atual" in pagina
+    assert (
+        "Próximo mandato" in pagina and "Mandato atual" in pagina and "fev. de 2023 a jan. de 2027" in pagina
+    )
     assert "R$ 1,2 mi" in pagina and "R$ 2,4 mi" in pagina
     assert "foto10.jpg" in pagina
+
+
+def test_profile_never_shows_a_posse_month_or_empty_dates(warehouse, tmp_path):
+    saida = site(warehouse, tmp_path)
+    for caminho in saida.rglob("*.html"):
+        pagina = caminho.read_text(encoding="utf-8")
+        assert "sem data" not in pagina, caminho  # mandato sem data não vira linha de "sem data a sem data"
+    pagina = texto(saida, "pessoa/2026-RJ-1.html")
+    assert "A partir de 2027, por 4 anos" in pagina and "Termina no início de 2031" in pagina
+    assert (
+        "fev. de 2027" not in pagina and "mai. de" not in pagina
+    )  # a data exata da posse não vem de fonte confiável
+    senador = texto(saida, "pessoa/2026-RJ-4.html")
+    assert "A partir de 2027, por 8 anos" in senador and "Termina no início de 2035" in senador
+
+
+def test_a_candidacy_with_two_rounds_appears_once_with_the_final_result(warehouse, tmp_path):
+    pagina = texto(site(warehouse, tmp_path), "pessoa/2026-RJ-1.html")
+    assert pagina.count("Candidatura em 2018") == 1 and "Governador, não eleito" in pagina
+    assert "2º turno" not in pagina.split("Candidatura em 2018")[1].split("</li>")[0]
+
+
+def test_legislature_dates_stand_in_for_the_missing_mandate_dates(warehouse):
+    todos = dados.mandatos(warehouse, 10)
+    assert [(m["dt_inicio"], m["dt_fim"]) for m in todos] == [
+        (date(2023, 2, 1), date(2027, 1, 31)),
+        (date(2019, 2, 1), date(2023, 1, 31)),
+    ]
 
 
 def test_profile_without_data_says_so_instead_of_showing_zero(warehouse, tmp_path):
