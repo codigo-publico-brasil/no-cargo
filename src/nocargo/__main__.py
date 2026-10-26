@@ -11,13 +11,14 @@ carregando dados, a geração falha até ela terminar.
 import argparse
 import os
 import shutil
+from collections import Counter
 from datetime import date
 from pathlib import Path
 
 import duckdb
 
-from nocargo import dados, paginas, textos
-from nocargo.formato import endereco
+from nocargo import dados, paginas, seo, textos
+from nocargo.formato import arquivo_da_ficha
 
 ENV_WAREHOUSE = "NOCARGO_WAREHOUSE"
 DEFAULT_WAREHOUSE = "../dado-publico-brasil/data_store/warehouse.duckdb"
@@ -38,6 +39,7 @@ def construir(con: dados.Connection, saida: Path, hoje: date | None = None) -> i
     capturado = max((r["dt_captura"] for r in situacao if r["dt_captura"]), default=None)
     saida.mkdir(parents=True, exist_ok=True)
     shutil.copytree(ESTATICOS, saida, dirs_exist_ok=True)  # css, js, símbolo e fontes (arquivos binários)
+    escritas: list[str] = ["index.html", "pessoas.html", "cargos.html", "como-calculamos.html"]
     escrever(saida / "index.html", paginas.brasil(ano, eleitos, situacao, capturado))
     escrever(saida / "pessoas.html", paginas.pessoas(ano, eleitos, capturado))
     escrever(saida / "cargos.html", textos.cargos())
@@ -45,6 +47,7 @@ def construir(con: dados.Connection, saida: Path, hoje: date | None = None) -> i
     total = 4
     for uf in paginas.UFS:
         escrever(saida / "estado" / f"{uf}.html", paginas.estado(uf, ano, eleitos, situacao, capturado))
+        escritas.append(f"estado/{uf}.html")
         total += 1
     for r in eleitos:
         mandatos = dados.mandatos(con, r["id_pessoa"]) if r["id_pessoa"] else []
@@ -56,11 +59,17 @@ def construir(con: dados.Connection, saida: Path, hoje: date | None = None) -> i
             if (h["ano_eleicao"], h["cargo"]) not in vistas
         ]
         desde = dados.ininterrupto_desde(mandatos, hoje)
-        escrever(
-            saida / "pessoa" / f"{endereco(r['id_candidatura'])}.html",
-            paginas.ficha(r, hoje, mandatos, candidaturas, desde),
-        )
+        arquivo = arquivo_da_ficha(r["nome_urna"], r["id_candidatura"])
+        escrever(saida / "pessoa" / arquivo, paginas.ficha(r, hoje, mandatos, candidaturas, desde))
+        escritas.append(f"pessoa/{arquivo}")
         total += 1
+    quantas = Counter(r["cargo"] for r in eleitos)
+    escrever(saida / "404.html", paginas.nao_encontrada())
+    escrever(saida / "robots.txt", seo.robots())
+    escrever(saida / "sitemap.xml", seo.sitemap([(c, capturado) for c in escritas]))
+    escrever(saida / "llms.txt", seo.llms(ano, capturado, dict(quantas)))
+    escrever(saida / "CNAME", seo.SITE.removeprefix("https://") + "\n")  # domínio próprio no GitHub Pages
+    escrever(saida / ".nojekyll", "")  # o Pages não passa o site pelo Jekyll
     return total
 
 

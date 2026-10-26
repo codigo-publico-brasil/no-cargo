@@ -5,11 +5,12 @@ import unicodedata
 from collections import Counter
 from datetime import date
 
+from nocargo import seo
 from nocargo.dados import CARGOS, EXECUTIVO, LEGISLATIVO, Row
 from nocargo.formato import (
+    arquivo_da_ficha,
     data_curta,
     e,
-    endereco,
     faixa,
     foto,
     hemiciclo,
@@ -58,17 +59,29 @@ FONTES = (
 )
 
 
-def pagina(titulo: str, corpo: str, ativa: str, raiz: str = "", descricao: str = "") -> str:
+def pagina(
+    titulo: str,
+    corpo: str,
+    ativa: str,
+    raiz: str = "",
+    descricao: str = "",
+    caminho: str | None = None,
+    schema: list[dict[str, object]] | None = None,
+) -> str:
+    """A página inteira. Com `caminho` (relativo à raiz do site), leva canônico, cartões de compartilhamento e dados estruturados."""
     menu = "".join(
         f'<a href="{raiz}{href}"{' aria-current="page"' if chave == ativa else ""}>{nome}</a>'
         for chave, nome, href in NAV
     )
     fontes = " &middot; ".join(f'<a href="{url}">{nome}</a>' for nome, url in FONTES)
+    descricao = descricao or "Quem ocupa o poder no Brasil, pelos três poderes, com a fonte oficial ao lado."
+    busca = seo.cabecalho(titulo, descricao, caminho, schema) if caminho is not None else ""
+    correcao = seo.link_de_correcao(titulo, caminho or "")
     return (
         '<!doctype html>\n<html lang="pt-BR" data-theme="light">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         f"<title>{e(titulo)} | No Cargo</title>\n"
-        f'<meta name="description" content="{e(descricao or "Quem ocupa o poder no Brasil, pelos três poderes, com a fonte oficial ao lado.")}">\n'
+        f'<meta name="description" content="{e(descricao)}">\n{busca}'
         f'<link rel="icon" href="{raiz}no-cargo.svg" type="image/svg+xml">\n'
         f'<link rel="stylesheet" href="{raiz}tokens.css">\n<link rel="stylesheet" href="{raiz}style.css">\n</head>\n<body>\n'
         f'<header class="topo"><div class="miolo"><a class="marca" href="{raiz}index.html" aria-label="No Cargo, página inicial">'
@@ -82,9 +95,21 @@ def pagina(titulo: str, corpo: str, ativa: str, raiz: str = "", descricao: str =
         f'<p>Um projeto do <a href="{SITE_MAE}">Código Público Brasil</a>. Código sob AGPL-3.0; dados curados sob CC BY 4.0.</p>'
         f"<p>Dados oficiais: {fontes}.</p>"
         f'<p class="links"><a href="{raiz}index.html">Início</a><a href="{raiz}cargos.html">Entenda os cargos</a><a href="{raiz}como-calculamos.html">Como calculamos e de onde vêm os dados</a>'
-        f'<a href="{REPO}">Código no GitHub &#8599;</a></p></div></footer>\n'
+        f'<a href="{correcao}">Encontrou um erro? Abra uma issue &#8599;</a><a href="{REPO}">Código no GitHub &#8599;</a></p></div></footer>\n'
         f'<script src="{raiz}app.js" defer></script>\n</body>\n</html>\n'
     )
+
+
+def nao_encontrada() -> str:
+    """A página 404 do GitHub Pages: leva de volta ao início e à lista de pessoas. Fora do índice dos buscadores."""
+    corpo = (
+        '<section class="heroi"><span class="sobretitulo">404</span><h1>Esta página não existe</h1>'
+        "<p>O endereço pode ter mudado. Procure a pessoa pelo nome ou volte ao início.</p></section>"
+        '<div class="secao"><p><a href="/pessoas.html">Todas as pessoas eleitas</a> &middot; <a href="/">Início</a> &middot; '
+        '<a href="/como-calculamos.html">Como calculamos</a></p></div>'
+    )
+    html = pagina("Página não encontrada", corpo, "", raiz="/")
+    return html.replace("<head>\n", '<head>\n<meta name="robots" content="noindex">\n', 1)
 
 
 def faixa_de_titulo(chave: str, titulo: str, subtitulo: str, extra: str = "") -> str:
@@ -187,7 +212,7 @@ def brasil(ano: int, eleitos: list[Row], situacao: list[Row], capturado: date | 
     pend = sum(int(s["qtd_pendentes"]) for s in governos)
     presidente = [r for r in eleitos if r["cargo"] == "Presidente"]
     pres_card = (
-        f'<div class="card"><h3>Presidente da República</h3><p><a href="pessoa/{endereco(presidente[0]["id_candidatura"])}.html">'
+        f'<div class="card"><h3>Presidente da República</h3><p><a href="pessoa/{arquivo_da_ficha(presidente[0]["nome_urna"], presidente[0]["id_candidatura"])}">'
         f"{e(presidente[0]['nome_urna'])}</a>, {e(presidente[0]['partido'])}.</p></div>"
         if presidente
         else '<div class="card aguardando"><h3>Presidente da República</h3><p>Aguardando o resultado do 2º turno. '
@@ -258,7 +283,14 @@ def brasil(ano: int, eleitos: list[Row], situacao: list[Row], capturado: date | 
         "</div>",
         legenda_dos_selos(),
     ]
-    return pagina("Brasil", "\n".join(corpo), "brasil")
+    return pagina(
+        "Brasil",
+        "\n".join(corpo),
+        "brasil",
+        descricao=f"Quem foi eleito em {ano}: composição de cada casa por partido, pelos três poderes, com a fonte oficial ao lado.",
+        caminho="index.html",
+        schema=[seo.site_schema()],
+    )
 
 
 PLURAL = {
@@ -275,7 +307,7 @@ def sem_acento(texto: str) -> str:
 def linha_de_pessoa(r: Row) -> str:
     nome_uf = UFS.get(r["uf"], (r["uf"],))[0]
     return (
-        f'<a class="pessoa linha" href="pessoa/{endereco(r["id_candidatura"])}.html" data-nome="{e(sem_acento(str(r["nome_urna"])))}" '
+        f'<a class="pessoa linha" href="pessoa/{arquivo_da_ficha(r["nome_urna"], r["id_candidatura"])}" data-nome="{e(sem_acento(str(r["nome_urna"])))}" '
         f'data-partido="{e(sem_acento(str(r["partido"])))}" data-cargo="{e(r["cargo"])}" data-uf="{e(r["uf"])}" '
         f'data-local="{e(sem_acento(f"{r['cargo']} {r['uf']} {nome_uf}"))}"><span class="dados"><b>{e(r["nome_urna"])}</b>'
         f"<span>{e(r['cargo'])} &middot; {e(r['uf'])} &middot; {e(r['partido'])}</span></span>"
@@ -321,6 +353,7 @@ def pessoas(ano: int, eleitos: list[Row], capturado: date | None) -> str:
         chr(10).join(corpo),
         "pessoas",
         descricao=f"As {numero(len(todos))} pessoas eleitas em {ano}, de todos os cargos e estados.",
+        caminho="pessoas.html",
     )
 
 
@@ -359,7 +392,7 @@ def legenda_dos_selos() -> str:
 def cartao_de_pessoa(r: Row) -> str:
     detalhe = f"{e(r['partido'])} &middot; {numero(r['qtd_votos'])} votos"
     return (
-        f'<a class="card pessoa" href="../pessoa/{endereco(r["id_candidatura"])}.html" data-nome="{e(str(r["nome_urna"]).lower())}" '
+        f'<a class="card pessoa" href="../pessoa/{arquivo_da_ficha(r["nome_urna"], r["id_candidatura"])}" data-nome="{e(str(r["nome_urna"]).lower())}" '
         f'data-partido="{e(str(r["partido"]).lower())}" data-tipo="{e(r["tipo_mandato"] or "sem")}" '
         f'data-votos="{r["qtd_votos"] or 0}">{foto(r["foto_url"], r["nome_urna"], 60)}'
         f'<span class="dados"><b>{e(r["nome_urna"])}</b><span>{detalhe}</span>{selo(r["tipo_mandato"], r["cargo"])}</span>'
@@ -472,7 +505,9 @@ def estado(uf: str, ano: int, eleitos: list[Row], situacao: list[Row], capturado
         "\n".join(corpo),
         "",
         raiz="../",
-        descricao=f"Os eleitos de {nome} em {ano}, pelos três poderes.",
+        descricao=f"Governador, senadores e deputados eleitos em {nome} em {ano}, com histórico, selo e a fonte oficial.",
+        caminho=f"estado/{uf}.html",
+        schema=[seo.migalhas([("Brasil", "index.html"), (nome, f"estado/{uf}.html")])],
     )
 
 
@@ -548,6 +583,7 @@ def ficha(
     r: Row, hoje: date, mandatos_da_pessoa: list[Row], candidaturas_da_pessoa: list[Row], desde: date | None
 ) -> str:
     cargo = r["cargo"]
+    caminho = "pessoa/" + arquivo_da_ficha(r["nome_urna"], r["id_candidatura"])
     anos = 8 if cargo == "Senador" else 4
     inicio = (
         r["ano_eleicao"] + 1
@@ -675,7 +711,27 @@ def ficha(
         f'<h2>A campanha de {r["ano_eleicao"]}</h2><div class="numeros">{campanha}</div>'
         '<p class="nota">Quando o dado não foi entregue ao TSE, mostramos Sem dado, nunca zero.</p>',
         f'<p class="nota">Fonte: <a href="{e(r["fonte_url"])}">TSE, candidaturas {r["ano_eleicao"]}</a>, capturado em {data_curta(r["dt_captura"])}. '
-        'Veja <a href="../como-calculamos.html">como calculamos</a>.</p>',
+        f'Veja <a href="../como-calculamos.html">como calculamos</a>. '
+        f'Encontrou um erro neste dado? <a href="{seo.link_de_correcao(r["nome_urna"] + ", " + cargo, caminho)}">Abra uma issue</a>.</p>',
         "</div>",
     ]
-    return pagina(f"{r['nome_urna']}, {cargo}", "\n".join(corpo), "brasil", raiz="../")
+    estado = UFS.get(r["uf"], (r["uf"],))[0]
+    return pagina(
+        f"{r['nome_urna']}, {cargo}",
+        "\n".join(corpo),
+        "brasil",
+        raiz="../",
+        descricao=(
+            f"{r['nome_urna']}, {cargo.lower()} por {estado} ({r['partido']}), eleição de {r['ano_eleicao']}: "
+            "mandatos, candidaturas, votos e campanha, com a fonte oficial."
+        ),
+        caminho=caminho,
+        schema=[
+            seo.pessoa_schema(
+                r["nome_urna"], cargo, r["partido"], estado, caminho, r["fonte_url"], r["dt_captura"]
+            ),
+            seo.migalhas(
+                [("Brasil", "index.html"), (estado, f"estado/{r['uf']}.html"), (r["nome_urna"], caminho)]
+            ),
+        ],
+    )

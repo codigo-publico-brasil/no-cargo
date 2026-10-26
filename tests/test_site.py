@@ -1,9 +1,10 @@
 import html
+import json
 import re
 from datetime import date
 from pathlib import Path
 
-from nocargo import cores, dados, formato
+from nocargo import cores, dados, formato, seo
 from nocargo.__main__ import construir
 from nocargo.cores import SEM_COR
 from nocargo.paginas import FONTES, REPO, SITE_MAE, sem_acento
@@ -18,7 +19,10 @@ def site(warehouse, tmp_path: Path) -> Path:
 
 
 def texto(saida: Path, caminho: str) -> str:
-    return (saida / caminho).read_text(encoding="utf-8")
+    """Lê uma página; `*` acha a ficha pelo sufixo (o nome da pessoa vem antes no endereço)."""
+    achados = list(saida.glob(caminho)) if "*" in caminho else [saida / caminho]
+    assert len(achados) == 1, (caminho, achados)
+    return achados[0].read_text(encoding="utf-8")
 
 
 def test_the_site_has_the_main_pages_one_page_per_state_and_one_per_elected(warehouse, tmp_path):
@@ -122,7 +126,7 @@ def test_district_deputies_are_shown_with_the_state_ones(warehouse, tmp_path):
 
 
 def test_profile_shows_time_in_office_timeline_and_the_campaign_totals(warehouse, tmp_path):
-    pagina = texto(site(warehouse, tmp_path), "pessoa/2026-RJ-1.html")
+    pagina = texto(site(warehouse, tmp_path), "pessoa/*-2026-rj-1.html")
     assert "7 anos e 8 meses" in pagina  # desde 1º de fev. de 2019 até 25/10/2026, sem interrupção
     assert (
         "Próximo mandato" in pagina and "Mandato atual" in pagina and "fev. de 2023 a jan. de 2027" in pagina
@@ -136,17 +140,17 @@ def test_profile_never_shows_a_posse_month_or_empty_dates(warehouse, tmp_path):
     for caminho in saida.rglob("*.html"):
         pagina = caminho.read_text(encoding="utf-8")
         assert "sem data" not in pagina, caminho  # mandato sem data não vira linha de "sem data a sem data"
-    pagina = texto(saida, "pessoa/2026-RJ-1.html")
+    pagina = texto(saida, "pessoa/*-2026-rj-1.html")
     assert "De 2027 a 2030, 4 anos" in pagina and "Termina no" not in pagina
     assert (
         "fev. de 2027" not in pagina and "mai. de" not in pagina
     )  # a data exata da posse não vem de fonte confiável
-    senador = texto(saida, "pessoa/2026-RJ-4.html")
+    senador = texto(saida, "pessoa/*-2026-rj-4.html")
     assert "De 2027 a 2034, 8 anos" in senador
 
 
 def test_a_candidacy_with_two_rounds_appears_once_with_the_final_result(warehouse, tmp_path):
-    pagina = texto(site(warehouse, tmp_path), "pessoa/2026-RJ-1.html")
+    pagina = texto(site(warehouse, tmp_path), "pessoa/*-2026-rj-1.html")
     assert pagina.count("Candidatura em 2018") == 1 and "Governador, não eleito" in pagina
     assert "2º turno" not in pagina.split("Candidatura em 2018")[1].split("</li>")[0]
 
@@ -160,7 +164,7 @@ def test_legislature_dates_stand_in_for_the_missing_mandate_dates(warehouse):
 
 
 def test_profile_without_data_says_so_instead_of_showing_zero(warehouse, tmp_path):
-    pagina = texto(site(warehouse, tmp_path), "pessoa/2026-RJ-2.html")
+    pagina = texto(site(warehouse, tmp_path), "pessoa/*-2026-rj-2.html")
     assert pagina.count(">Sem dado</b>") == 3  # bens, receitas e despesas
     assert "R$ 0" not in pagina
 
@@ -170,16 +174,16 @@ def test_an_elected_without_a_link_gets_no_novato_badge_and_says_the_history_is_
 ):
     saida = site(warehouse, tmp_path)
     pagina = texto(
-        saida, "pessoa/2026-SP-6.html"
+        saida, "pessoa/*-2026-sp-6.html"
     )  # deputado estadual sem ligação e sem eleição anterior achada
     assert "Histórico de mandatos não confirmado" in pagina and "não quer dizer que seja novata" in pagina
     assert "Novato" not in pagina and "Primeiro mandato na" not in pagina
-    bruno = texto(saida, "pessoa/2026-RJ-2.html")  # sem ligação à Câmara, mas com eleição anterior no TSE
+    bruno = texto(saida, "pessoa/*-2026-rj-2.html")  # sem ligação à Câmara, mas com eleição anterior no TSE
     assert "Novato" not in bruno and "Primeiro mandato na" not in bruno
 
 
 def test_novato_only_appears_for_someone_linked_and_without_a_previous_mandate(warehouse, tmp_path):
-    pagina = texto(site(warehouse, tmp_path), "pessoa/2026-RJ-8.html")
+    pagina = texto(site(warehouse, tmp_path), "pessoa/*-2026-rj-8.html")
     assert (
         "Novato" in pagina
         and "Primeiro mandato na Câmara dos Deputados." in pagina
@@ -194,7 +198,7 @@ def test_state_filters_only_list_the_types_that_exist_with_counts_and_a_no_badge
 
 
 def test_past_candidacies_without_mandate_appear_apart_from_mandates(warehouse, tmp_path):
-    pagina = texto(site(warehouse, tmp_path), "pessoa/2026-RJ-3.html")
+    pagina = texto(site(warehouse, tmp_path), "pessoa/*-2026-rj-3.html")
     assert "Candidatura em 2018" in pagina and "deputado estadual" in pagina.lower()
 
 
@@ -209,7 +213,11 @@ def test_names_are_escaped_and_pages_load_nothing_from_other_sites(warehouse, tm
         )  # site e redes que a própria pessoa informou
         externos = re.findall(r'(?:src|href)="(https?://[^"]+)"', html)
         assert all(
-            u in permitidos or "dadosabertos.tse.jus.br" in u or "exemplo.gov.br" in u for u in externos
+            u in permitidos
+            or u.startswith((REPO, seo.SITE))
+            or "dadosabertos.tse.jus.br" in u
+            or "exemplo.gov.br" in u
+            for u in externos
         ), caminho
     for arquivo in (saida / "style.css", saida / "tokens.css"):
         assert "http" not in re.sub(r"/\*.*?\*/", "", arquivo.read_text(encoding="utf-8"), flags=re.S), (
@@ -265,13 +273,13 @@ def test_a_deputy_elected_senator_is_novato_in_the_senate_and_the_page_says_the_
     warehouse.execute(
         "UPDATE marts.eleitos SET id_pessoa = 10, tipo_mandato = 'novato' WHERE id_candidatura = '2026:RJ:4'"
     )
-    pagina = texto(site(warehouse, tmp_path), "pessoa/2026-RJ-4.html")
+    pagina = texto(site(warehouse, tmp_path), "pessoa/*-2026-rj-4.html")
     assert "Primeiro mandato no Senado Federal." in pagina and "Já exerceu mandato na outra casa" in pagina
     assert "Primeiro mandato no Congresso" not in pagina
 
 
 def test_a_win_for_another_office_appears_as_a_mandate_from_the_election_result(warehouse, tmp_path):
-    pagina = texto(site(warehouse, tmp_path), "pessoa/2026-RJ-1.html")
+    pagina = texto(site(warehouse, tmp_path), "pessoa/*-2026-rj-1.html")
     assert "Eleito em 2014" in pagina and "Governador, mandato previsto de 2015 a 2018" in pagina
     assert "não registra afastamentos" in pagina
     assert "Eleito em 2022" not in pagina  # deputado federal: o mandato já vem da Câmara
@@ -281,7 +289,7 @@ def test_a_win_for_another_office_appears_as_a_mandate_from_the_election_result(
 
 
 def test_an_elected_without_a_link_shows_the_earlier_elections_found_in_the_tse(warehouse, tmp_path):
-    pagina = texto(site(warehouse, tmp_path), "pessoa/2026-RJ-2.html")  # Bruno
+    pagina = texto(site(warehouse, tmp_path), "pessoa/*-2026-rj-2.html")  # Bruno
     assert "Já foi eleito antes" in pagina and "Eleito em 2018" in pagina
     assert "Deputado federal, mandato previsto de 2019 a 2022" in pagina
     assert "Candidatura em 2014" in pagina and "Vereador, suplente" in pagina
@@ -314,7 +322,7 @@ def test_powers_are_section_headings_and_the_css_has_no_heavy_borders(warehouse,
 
 def test_the_person_block_has_the_six_facts_and_short_links(warehouse, tmp_path):
     saida = site(warehouse, tmp_path)
-    ana = texto(saida, "pessoa/2026-RJ-1.html")
+    ana = texto(saida, "pessoa/*-2026-rj-1.html")
     topo = ana[
         ana.index('<section class="heroi ficha">') : ana.index("</section>")
     ]  # tudo no bloco do título
@@ -325,7 +333,7 @@ def test_the_person_block_has_the_six_facts_and_short_links(warehouse, tmp_path)
     )  # o endereço longo só vai no title e no href
     assert "javascript:" not in ana and "," not in topo.split("<dt>Rede social</dt>")[1].split("</dd>")[0]
     assert "Quem é</h2>" not in ana and "Na eleição de" not in ana and "No cadastro" not in ana
-    bruno = texto(saida, "pessoa/2026-RJ-2.html")  # sem ligação ao cadastro
+    bruno = texto(saida, "pessoa/*-2026-rj-2.html")  # sem ligação ao cadastro
     assert (
         "que ainda não está ligado a esta pessoa" in bruno and "<dt>Nascimento</dt><dd>Sem dado</dd>" in bruno
     )
@@ -357,3 +365,70 @@ def test_the_people_page_lists_everyone_elected_in_alphabetical_order_without_ra
     assert 'data-cargo="Senador"' in pagina and ">Pessoas</a>" in texto(saida, "index.html")
     assert 'href="pessoas.html">Veja todas' in texto(saida, "index.html")
     assert "data-cargo" in texto(saida, "app.js")
+
+
+def test_every_page_can_be_found_canonical_description_share_card_and_structured_data(warehouse, tmp_path):
+    saida = site(warehouse, tmp_path)
+    descricoes = set()
+    for caminho in saida.rglob("*.html"):
+        if caminho.name == "404.html":
+            continue
+        pagina = caminho.read_text(encoding="utf-8")
+        relativo = caminho.relative_to(saida).as_posix()
+        assert f'<link rel="canonical" href="{seo.url(relativo)}">' in pagina, relativo
+        assert (
+            'property="og:title"' in pagina and 'property="og:image"' in pagina and "twitter:card" in pagina
+        ), relativo
+        assert "noindex" not in pagina, relativo
+        descricoes.add(re.search(r'<meta name="description" content="([^"]+)"', pagina).group(1))
+    assert len(descricoes) > 8  # as fichas e os estados têm descrição própria, não a mesma para todos
+
+
+def test_structured_data_is_valid_json_and_the_person_page_has_only_public_facts(warehouse, tmp_path):
+    saida = site(warehouse, tmp_path)
+    ficha = texto(saida, "pessoa/*-2026-rj-1.html")
+    blocos = re.findall(r'<script type="application/ld\+json">(.*?)</script>', ficha, flags=re.S)
+    dados_ = json.loads(blocos[0])["@graph"]
+    pessoa = next(d for d in dados_ if d["@type"] == "Person")
+    assert pessoa["name"] == "Ana Exemplo" and pessoa["jobTitle"] == "Deputado federal"
+    assert not {"birthDate", "email", "telephone", "address"} & set(
+        pessoa
+    )  # só nome, cargo, partido e estado
+    assert next(d for d in dados_ if d["@type"] == "BreadcrumbList")["itemListElement"][0]["name"] == "Brasil"
+    assert json.loads(
+        re.search(r'application/ld\+json">(.*?)</script>', texto(saida, "index.html"), flags=re.S).group(1)
+    )
+
+
+def test_the_site_publishes_robots_sitemap_llms_404_and_the_domain_for_github_pages(warehouse, tmp_path):
+    saida = site(warehouse, tmp_path)
+    robots = texto(saida, "robots.txt")
+    assert (
+        "Sitemap: " in robots
+        and "User-agent: GPTBot\nAllow: /" in robots
+        and "User-agent: ClaudeBot\nAllow: /" in robots
+    )
+    assert "Disallow" not in robots
+    sitemap = texto(saida, "sitemap.xml")
+    paginas = list(saida.rglob("*.html"))
+    assert sitemap.count("<loc>") == len(paginas) - 1  # todas, menos a 404
+    assert "/404.html" not in sitemap and seo.url("pessoas.html") in sitemap
+    assert seo.SITE in texto(saida, "llms.txt") and "provisório" in texto(saida, "llms.txt")
+    assert 'content="noindex"' in texto(saida, "404.html")
+    assert (
+        texto(saida, "CNAME").strip() == seo.SITE.removeprefix("https://") and (saida / ".nojekyll").exists()
+    )
+
+
+def test_a_person_page_links_to_a_prefilled_correction_issue(warehouse, tmp_path):
+    ficha = texto(site(warehouse, tmp_path), "pessoa/*-2026-rj-1.html")
+    assert f"{REPO}/issues/new?template=correcao.yml" in ficha and "pagina=https%3A%2F%2F" in ficha
+    assert "Encontrou um erro neste dado?" in ficha
+
+
+def test_person_pages_have_the_name_in_the_address(warehouse, tmp_path):
+    saida = site(warehouse, tmp_path)
+    nomes = {p.name for p in (saida / "pessoa").glob("*.html")}
+    assert (
+        "ana-exemplo-2026-rj-1.html" in nomes and "b-carla-b-teste-2026-rj-3.html" in nomes
+    )  # a marcação HTML do nome não vira endereço, só letras e números

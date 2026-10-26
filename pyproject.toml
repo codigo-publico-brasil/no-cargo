@@ -31,6 +31,7 @@ select = ["E", "F", "I", "B", "UP"]
 "src/nocargo/textos.py" = ["E501"]
 "src/nocargo/formato.py" = ["E501"]
 "src/nocargo/dados.py" = ["E501"]
+"src/nocargo/seo.py" = ["E501"]
 
 [tool.mypy]
 strict = true

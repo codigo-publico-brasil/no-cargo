@@ -1,0 +1,25 @@
+name: Correção de dado
+description: Um dado do site difere da fonte oficial ou está faltando.
+labels: ["correcao"]
+body:
+  - type: input
+    id: pagina
+    attributes:
+      label: Página
+      description: Endereço da página com o problema.
+    validations:
+      required: true
+  - type: textarea
+    id: dado
+    attributes:
+      label: Qual dado está errado ou faltando
+      description: Diga o que o site mostra e o que deveria mostrar.
+    validations:
+      required: true
+  - type: input
+    id: fonte
+    attributes:
+      label: Link da fonte oficial
+      description: Página do TSE, Câmara, Senado ou outro órgão que mostra o dado correto.
+    validations:
+      required: true

@@ -1,6 +1,8 @@
 """Formatação de datas, valores e blocos HTML pequenos, iguais em todas as páginas."""
 
 import math
+import re
+import unicodedata
 from datetime import date
 from html import escape
 
@@ -25,6 +27,17 @@ def e(valor: object) -> str:
 def endereco(id_candidatura: str) -> str:
     """Nome do arquivo da ficha: o identificador da candidatura sem os dois pontos, que o Windows não aceita."""
     return id_candidatura.replace(":", "-")
+
+
+def slug(texto: str, limite: int = 60) -> str:
+    """`Erika Hilton` vira `erika-hilton`: o nome no endereço ajuda a achar a página, e o identificador a mantém única."""
+    sem_acento = "".join(c for c in unicodedata.normalize("NFD", texto) if not unicodedata.combining(c))
+    return re.sub(r"[^a-z0-9]+", "-", sem_acento.lower()).strip("-")[:limite].strip("-")
+
+
+def arquivo_da_ficha(nome_urna: str, id_candidatura: str) -> str:
+    """`erika-hilton-2026-sp-250002539612.html`: nome, ano, UF e sequencial, estável entre gerações do site."""
+    return f"{slug(nome_urna)}-{endereco(id_candidatura).lower()}.html"
 
 
 def mes_ano(d: date | None) -> str:
