@@ -12,11 +12,12 @@
     var busca = lista.querySelector("input");
     var itens = Array.prototype.slice.call(lista.querySelectorAll(".pessoa"));
     var contagem = lista.querySelector(".contagem");
-    var estado = { tipo: "", ordem: "nome" };
+    var estado = { tipo: "", cargo: "", ordem: "nome" };
     var alvo = lista.querySelector(".itens");
 
     function chave(i, ordem) {
       if (ordem === "votos") { return -Number(i.dataset.votos); }
+      if (ordem === "uf") { return i.dataset.uf + " " + norm(i.dataset.nome); }
       return norm(ordem === "partido" ? i.dataset.partido + " " + i.dataset.nome : i.dataset.nome);
     }
 
@@ -28,8 +29,9 @@
         return x < y ? -1 : x > y ? 1 : 0;
       });
       itens.forEach(function (i) {
-        var ok = (!estado.tipo || i.dataset.tipo === estado.tipo) &&
-          (!termo || norm(i.dataset.nome).indexOf(termo) >= 0 || norm(i.dataset.partido).indexOf(termo) >= 0);
+        var ok = (!estado.tipo || i.dataset.tipo === estado.tipo) && (!estado.cargo || i.dataset.cargo === estado.cargo) &&
+          (!termo || norm(i.dataset.nome).indexOf(termo) >= 0 || norm(i.dataset.partido).indexOf(termo) >= 0 ||
+            (i.dataset.local && norm(i.dataset.local).indexOf(termo) >= 0));
         i.hidden = !ok;
         if (ok) { visiveis += 1; }
         alvo.appendChild(i);
@@ -41,6 +43,9 @@
     busca.addEventListener("input", aplicar);
     lista.querySelectorAll("button[data-tipo]").forEach(function (b) {
       b.addEventListener("click", function () { estado.tipo = b.dataset.tipo; ativar(lista, "data-tipo", estado.tipo); aplicar(); });
+    });
+    lista.querySelectorAll("button[data-cargo]").forEach(function (b) {
+      b.addEventListener("click", function () { estado.cargo = b.dataset.cargo; ativar(lista, "data-cargo", estado.cargo); aplicar(); });
     });
     lista.querySelectorAll("button[data-ordem]").forEach(function (b) {
       b.addEventListener("click", function () { estado.ordem = b.dataset.ordem; ativar(lista, "data-ordem", estado.ordem); aplicar(); });

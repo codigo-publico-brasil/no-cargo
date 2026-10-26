@@ -80,6 +80,8 @@ def como_calculamos() -> str:
         "<h2>Provisório e confirmado</h2>"
         '<div class="card aguardando"><p><b>Aguardando resultado:</b> o cargo ainda não tem eleito, por exemplo enquanto o 2º turno não termina.</p></div>'
         '<div class="card"><p><b>Resultado provisório:</b> o TSE já informa o eleito, mas a diplomação, que confirma o resultado, ainda não aconteceu.</p></div>'
+        '<div class="card"><p><b>Confirmado:</b> o resultado passa a ser confirmado na diplomação, que a Justiça Eleitoral faz depois da eleição e antes da posse. '
+        "Hoje todos os resultados aparecem como provisórios, porque a plataforma de dados ainda não traz a diplomação.</p></div>"
         "<h2>O critério é igual para todos</h2><ul>"
         "<li>Mesmo modelo de página e mesmos campos, na mesma ordem, para todos os partidos.</li>"
         "<li>Listas de pessoas começam em ordem alfabética; quem quiser filtra ou ordena. A barra de partidos vai do que tem mais cadeiras ao que tem menos, e as cores só separam os grupos.</li>"

@@ -22,7 +22,12 @@ CREATE TABLE marts.eleitos_cargos (
     ano_eleicao integer, uf varchar, ue varchar, cargo varchar, qtd_vagas integer, qtd_eleitos bigint,
     qtd_pendentes bigint, status varchar, dt_posse date, dt_captura date
 )"""
-PESSOAS = "CREATE TABLE marts.pessoas (id_pessoa bigint, foto_url varchar)"
+PESSOAS = """
+CREATE TABLE marts.pessoas (
+    id_pessoa bigint, foto_url varchar, fonte varchar, nome_civil varchar, dt_nascimento date,
+    municipio_nascimento varchar, uf_nascimento varchar, profissoes varchar, site_url varchar,
+    rede_social_url varchar, dt_captura date
+)"""
 CANDIDATURAS = """
 CREATE TABLE marts.candidaturas (
     id_pessoa bigint, ano_eleicao integer, turno integer, uf varchar, cargo varchar, partido varchar,
@@ -96,8 +101,12 @@ def warehouse(tmp_path) -> Iterator[duckdb.DuckDBPyConnection]:
             "INSERT INTO marts.eleitos_cargos VALUES (2026, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (uf, uf, cargo, vagas, eleitos, vagas - eleitos, status, POSSE, CAPTURA),
         )
-    con.execute(
-        "INSERT INTO marts.pessoas VALUES (10, 'https://exemplo.gov.br/foto10.jpg'), (12, NULL), (14, NULL)"
+    con.execute(  # Ana (10) tem cadastro completo; Carla (12) e Nina (14) só a foto, para mostrar Sem dado
+        "INSERT INTO marts.pessoas VALUES (10, 'https://exemplo.gov.br/foto10.jpg', 'camara', 'Ana Maria Exemplo da Silva',"
+        " DATE '1975-03-09', 'Niterói', 'RJ', 'Advogada; professora', 'https://exemplo.gov.br/ana', 'javascript:alert(1), https://www.instagram.com/ana.exemplo/?hl=pt&igsh=abcdefghijklmnopqrstuvwxyz0123456789,https://twitter.com/anaexemplo', ?),"
+        " (12, NULL, 'camara', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),"
+        " (14, NULL, 'senado', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)",
+        (CAPTURA,),
     )
     con.execute(
         "INSERT INTO marts.candidaturas VALUES (10, 2022, 1, 'RJ', 'Deputado federal', 'Partido A', 'Eleito por qp', ?),"

@@ -39,9 +39,10 @@ def construir(con: dados.Connection, saida: Path, hoje: date | None = None) -> i
     saida.mkdir(parents=True, exist_ok=True)
     shutil.copytree(ESTATICOS, saida, dirs_exist_ok=True)  # css, js, símbolo e fontes (arquivos binários)
     escrever(saida / "index.html", paginas.brasil(ano, eleitos, situacao, capturado))
+    escrever(saida / "pessoas.html", paginas.pessoas(ano, eleitos, capturado))
     escrever(saida / "cargos.html", textos.cargos())
     escrever(saida / "como-calculamos.html", textos.como_calculamos())
-    total = 3
+    total = 4
     for uf in paginas.UFS:
         escrever(saida / "estado" / f"{uf}.html", paginas.estado(uf, ano, eleitos, situacao, capturado))
         total += 1

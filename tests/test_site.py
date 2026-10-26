@@ -1,3 +1,4 @@
+import html
 import re
 from datetime import date
 from pathlib import Path
@@ -5,7 +6,7 @@ from pathlib import Path
 from nocargo import cores, dados, formato
 from nocargo.__main__ import construir
 from nocargo.cores import SEM_COR
-from nocargo.paginas import FONTES, REPO, SITE_MAE
+from nocargo.paginas import FONTES, REPO, SITE_MAE, sem_acento
 
 HOJE = date(2026, 10, 25)
 
@@ -136,12 +137,12 @@ def test_profile_never_shows_a_posse_month_or_empty_dates(warehouse, tmp_path):
         pagina = caminho.read_text(encoding="utf-8")
         assert "sem data" not in pagina, caminho  # mandato sem data não vira linha de "sem data a sem data"
     pagina = texto(saida, "pessoa/2026-RJ-1.html")
-    assert "A partir de 2027, por 4 anos" in pagina and "Termina no início de 2031" in pagina
+    assert "De 2027 a 2030, 4 anos" in pagina and "Termina no" not in pagina
     assert (
         "fev. de 2027" not in pagina and "mai. de" not in pagina
     )  # a data exata da posse não vem de fonte confiável
     senador = texto(saida, "pessoa/2026-RJ-4.html")
-    assert "A partir de 2027, por 8 anos" in senador and "Termina no início de 2035" in senador
+    assert "De 2027 a 2034, 8 anos" in senador
 
 
 def test_a_candidacy_with_two_rounds_appears_once_with_the_final_result(warehouse, tmp_path):
@@ -202,7 +203,10 @@ def test_names_are_escaped_and_pages_load_nothing_from_other_sites(warehouse, tm
     assert "<b>Carla</b>" not in pagina and "&lt;b&gt;Carla&lt;/b&gt; Teste" in pagina
     permitidos = {SITE_MAE, REPO, *(url for _, url in FONTES)}
     for caminho in saida.rglob("*.html"):
-        externos = re.findall(r'(?:src|href)="(https?://[^"]+)"', caminho.read_text(encoding="utf-8"))
+        html = re.sub(
+            r'<a class="curto"[^>]*>', "", caminho.read_text(encoding="utf-8")
+        )  # site e redes que a própria pessoa informou
+        externos = re.findall(r'(?:src|href)="(https?://[^"]+)"', html)
         assert all(
             u in permitidos or "dadosabertos.tse.jus.br" in u or "exemplo.gov.br" in u for u in externos
         ), caminho
@@ -214,6 +218,27 @@ def test_names_are_escaped_and_pages_load_nothing_from_other_sites(warehouse, tm
         (saida / "fonts" / f).stat().st_size > 1000
         for f in ("fraunces.woff2", "inter.woff2", "jetbrains-mono.woff2")
     )
+
+
+def test_header_has_one_home_link_the_repo_and_the_project_symbol(warehouse, tmp_path):
+    saida = site(warehouse, tmp_path)
+    for caminho in ("index.html", "estado/RJ.html", "cargos.html"):
+        pagina = texto(saida, caminho)
+        topo = pagina[pagina.index('<header class="topo">') : pagina.index("</header>")]
+        assert topo.count('class="marca"') == 1 and "no-cargo.svg" in topo and REPO in topo
+    assert (saida / "no-cargo.svg").exists()
+    assert (
+        'data-theme="light"' in texto(saida, "index.html") and "Código Público Brasil" not in topo
+    )  # só tema claro; o nome da organização fica no rodapé
+
+
+def test_state_page_collapses_long_lists_and_links_to_the_three_powers(warehouse, tmp_path):
+    pagina = texto(site(warehouse, tmp_path), "estado/RJ.html")
+    assert (
+        pagina.count('<details class="recolhivel">') == 2 and '<details class="recolhivel" open' not in pagina
+    )
+    for poder in ("executivo", "legislativo", "judiciario"):
+        assert f'href="#poder-{poder}"' in pagina and f'id="poder-{poder}"' in pagina
 
 
 def test_time_in_office_counts_a_chain_of_mandates_and_stops_at_a_gap(warehouse):
@@ -254,27 +279,6 @@ def test_a_win_for_another_office_appears_as_a_mandate_from_the_election_result(
     )  # do mais recente para o mais antigo
 
 
-def test_header_has_one_home_link_the_repo_and_the_project_symbol(warehouse, tmp_path):
-    saida = site(warehouse, tmp_path)
-    for caminho in ("index.html", "estado/RJ.html", "cargos.html"):
-        pagina = texto(saida, caminho)
-        topo = pagina[pagina.index('<header class="topo">') : pagina.index("</header>")]
-        assert topo.count('class="marca"') == 1 and "no-cargo.svg" in topo and REPO in topo
-    assert (saida / "no-cargo.svg").exists()
-    assert (
-        'data-theme="light"' in texto(saida, "index.html") and "Código Público Brasil" not in topo
-    )  # só tema claro; o nome da organização fica no rodapé
-
-
-def test_state_page_collapses_long_lists_and_links_to_the_three_powers(warehouse, tmp_path):
-    pagina = texto(site(warehouse, tmp_path), "estado/RJ.html")
-    assert (
-        pagina.count('<details class="recolhivel">') == 2 and '<details class="recolhivel" open' not in pagina
-    )
-    for n in "123":
-        assert f'href="#poder-{n}"' in pagina and f'id="poder-{n}"' in pagina
-
-
 def test_state_and_person_pages_say_where_you_are_and_link_back(warehouse, tmp_path):
     saida = site(warehouse, tmp_path)
     estado = texto(saida, "estado/RJ.html")
@@ -297,3 +301,50 @@ def test_powers_are_section_headings_and_the_css_has_no_heavy_borders(warehouse,
         r"border[a-z-]*:[^;}]*\b[2-9]px (solid|dashed)",
         css.replace("3px dashed", "").replace("3px solid", ""),
     )
+
+
+def test_the_person_block_has_the_six_facts_and_short_links(warehouse, tmp_path):
+    saida = site(warehouse, tmp_path)
+    ana = texto(saida, "pessoa/2026-RJ-1.html")
+    topo = ana[
+        ana.index('<section class="heroi ficha">') : ana.index("</section>")
+    ]  # tudo no bloco do título
+    assert "09/03/1975" in topo and "Niterói, RJ" in topo and "Advogada, professora" in topo
+    assert ">Instagram</a>" in topo and ">X</a>" in topo and ">exemplo.gov.br</a>" in topo
+    assert "igsh=" not in re.sub(
+        r'title="[^"]*"|href="[^"]*"', "", topo
+    )  # o endereço longo só vai no title e no href
+    assert "javascript:" not in ana and "," not in topo.split("<dt>Rede social</dt>")[1].split("</dd>")[0]
+    assert "Quem é</h2>" not in ana and "Na eleição de" not in ana and "No cadastro" not in ana
+    bruno = texto(saida, "pessoa/2026-RJ-2.html")  # sem ligação ao cadastro
+    assert (
+        "que ainda não está ligado a esta pessoa" in bruno and "<dt>Nascimento</dt><dd>Sem dado</dd>" in bruno
+    )
+
+
+def test_the_menu_has_origens_and_a_round_github_button_and_the_home_has_the_powers_index(
+    warehouse, tmp_path
+):
+    saida = site(warehouse, tmp_path)
+    brasil = texto(saida, "index.html")
+    topo = brasil[brasil.index('<header class="topo">') : brasil.index("</header>")]
+    assert ">Origens</a>" in topo and "Método" not in topo and 'class="gh"' in topo and REPO in topo
+    assert 'href="#poder-executivo"' in brasil and "Poder 1" not in brasil and "poder-num" not in brasil
+
+
+def test_the_people_page_lists_everyone_elected_in_alphabetical_order_without_ranking(warehouse, tmp_path):
+    saida = site(warehouse, tmp_path)
+    pagina = texto(saida, "pessoas.html")
+    nomes = re.findall(
+        r'<a class="pessoa linha" href="pessoa/[^"]+"[^>]*><span class="dados"><b>(.*?)</b>', pagina
+    )
+    total = warehouse.execute("SELECT count(*) FROM marts.eleitos").fetchone()[0]
+    assert len(nomes) == total and nomes == sorted(nomes, key=lambda n: sem_acento(html.unescape(n)))
+    assert "&lt;b&gt;Carla&lt;/b&gt; Teste" in pagina  # nomes escapados
+    assert "SP" in pagina and "Elisa Ficticia" in pagina  # de qualquer estado
+    assert (
+        'data-ordem="votos"' not in pagina and "<img" not in pagina.split("<main>")[1]
+    )  # sem ordem por votos e sem foto (página leve)
+    assert 'data-cargo="Senador"' in pagina and ">Pessoas</a>" in texto(saida, "index.html")
+    assert 'href="pessoas.html">Veja todas' in texto(saida, "index.html")
+    assert "data-cargo" in texto(saida, "app.js")
