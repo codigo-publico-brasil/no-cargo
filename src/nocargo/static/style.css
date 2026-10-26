@@ -30,6 +30,7 @@ main{max-width:720px;margin:0 auto}
 .selo.novato{background:#F6C21B;color:#2B2100}
 .selo.reeleito{background:#2F6FDB;color:#fff}
 .selo.retorno{background:#E8690B;color:#2B1400}
+.selo.semselo{background:#E3EAF2;color:#3A4A60}
 .selo.provisorio{background:#fff;color:var(--tinta);border:2px dashed #7A8798}
 .selo.obra-selo{background:#E3EAF2;color:#3A4A60;font-size:13px}
 .poder{margin-top:14px;background:var(--escuro);color:#fff;border-radius:24px;padding:18px;display:flex;flex-direction:column;gap:6px}

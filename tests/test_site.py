@@ -24,7 +24,7 @@ def test_the_site_has_the_main_pages_one_page_per_state_and_one_per_elected(ware
     for pagina in ("index.html", "cargos.html", "como-calculamos.html", "style.css", "app.js"):
         assert (saida / pagina).exists()
     assert len(list((saida / "estado").glob("*.html"))) == 27
-    assert len(list((saida / "pessoa").glob("*.html"))) == 7
+    assert len(list((saida / "pessoa").glob("*.html"))) == 8
 
 
 def test_brazil_page_separates_the_three_powers_and_their_spheres(warehouse, tmp_path):
@@ -160,9 +160,34 @@ def test_legislature_dates_stand_in_for_the_missing_mandate_dates(warehouse):
 def test_profile_without_data_says_so_instead_of_showing_zero(warehouse, tmp_path):
     pagina = texto(site(warehouse, tmp_path), "pessoa/2026-RJ-2.html")
     assert pagina.count(">Sem dado</b>") == 3  # bens, receitas e despesas
-    assert "Ainda não tomou posse" in pagina
-    assert "Primeiro mandato no Congresso" in pagina  # o novato tem aviso e selo
     assert "R$ 0" not in pagina
+
+
+def test_an_elected_without_a_link_gets_no_novato_badge_and_says_the_history_is_unconfirmed(
+    warehouse, tmp_path
+):
+    saida = site(warehouse, tmp_path)
+    pagina = texto(saida, "pessoa/2026-RJ-2.html")  # Bruno: deputado federal sem ligação a uma pessoa
+    assert "Histórico de mandatos não confirmado" in pagina and "não quer dizer que seja novata" in pagina
+    assert "Novato" not in pagina and "Primeiro mandato na" not in pagina
+    assert "Histórico de mandatos não disponível" in texto(
+        saida, "pessoa/2026-SP-6.html"
+    )  # estadual: sem base de mandatos
+
+
+def test_novato_only_appears_for_someone_linked_and_without_a_previous_mandate(warehouse, tmp_path):
+    pagina = texto(site(warehouse, tmp_path), "pessoa/2026-RJ-8.html")
+    assert (
+        "Novato" in pagina
+        and "Primeiro mandato na Câmara dos Deputados." in pagina
+        and "Ainda não tomou posse" in pagina
+    )
+
+
+def test_state_filters_only_list_the_types_that_exist_with_counts_and_a_no_badge_option(warehouse, tmp_path):
+    pagina = texto(site(warehouse, tmp_path), "estado/RJ.html")
+    assert "Sem selo (1)" in pagina and "Novatos (1)" in pagina and 'data-tipo="sem"' in pagina
+    assert "Retorno (1)" in pagina and "Reeleitos (1)" in pagina
 
 
 def test_past_candidacies_without_mandate_appear_apart_from_mandates(warehouse, tmp_path):
@@ -194,3 +219,14 @@ def test_formatting_helpers():
     assert formato.reais(1_200_000) == "R$ 1,2 mi" and formato.numero(1234567) == "1.234.567"
     assert formato.tempo(date(2015, 2, 1), date(2026, 10, 25)) == "11 anos e 8 meses"
     assert formato.mes_ano(date(2027, 2, 1)) == "fev. de 2027"
+
+
+def test_a_deputy_elected_senator_is_novato_in_the_senate_and_the_page_says_the_other_house(
+    warehouse, tmp_path
+):
+    warehouse.execute(
+        "UPDATE marts.eleitos SET id_pessoa = 10, tipo_mandato = 'novato' WHERE id_candidatura = '2026:RJ:4'"
+    )
+    pagina = texto(site(warehouse, tmp_path), "pessoa/2026-RJ-4.html")
+    assert "Primeiro mandato no Senado Federal." in pagina and "Já exerceu mandato na outra casa" in pagina
+    assert "Primeiro mandato no Congresso" not in pagina
