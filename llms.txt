@@ -1,0 +1,22 @@
+# No Cargo
+
+> No Cargo mostra quem ocupa o poder no Brasil, pelos três poderes (Executivo, Legislativo e Judiciário) e pelas esferas federal, estadual e municipal, com a fonte oficial e a data de captura ao lado de cada dado. Hoje cobre as 1647 pessoas eleitas nas eleições gerais de 2026 (1035 deputado estadual, 513 deputado federal, 54 senador, 21 governador, 24 deputado distrital). Prefeitos, vereadores e o Judiciário estão em construção.
+
+Dados atualizados em 25/10/2026. O resultado de 2026 é provisório até a diplomação. Não há ranking, nota nem recomendação de voto; todas as pessoas seguem o mesmo modelo de página.
+
+## Onde está cada coisa
+- [Início](https://nocargo.codigopublicobrasil.com.br/): composição de cada casa por partido (Câmara, Senado, Assembleias, governos).
+- [Todas as pessoas](https://nocargo.codigopublicobrasil.com.br/pessoas.html): lista de todos os eleitos, com busca e filtros.
+- [Entenda os cargos](https://nocargo.codigopublicobrasil.com.br/cargos.html): o que cada cargo faz, em palavras simples.
+- [Como calculamos](https://nocargo.codigopublicobrasil.com.br/como-calculamos.html): de onde vêm os dados, como as pessoas são ligadas entre eleições e o que não sabemos.
+- Páginas por estado: `https://nocargo.codigopublicobrasil.com.br/estado/SP.html` (sigla da UF).
+- Páginas por pessoa: `https://nocargo.codigopublicobrasil.com.br/pessoa/<nome>-<ano>-<uf>-<sequencial>.html`, listadas em [sitemap.xml](https://nocargo.codigopublicobrasil.com.br/sitemap.xml).
+
+## Fontes oficiais
+- Tribunal Superior Eleitoral (TSE), dados abertos: candidaturas, resultados, bens e prestação de contas.
+- Câmara dos Deputados e Senado Federal, dados abertos: mandatos, votações e fotos.
+
+## Como citar
+Cite a página e a data de captura. Cada página tem endereço permanente e o texto "Fonte" com o link oficial. Para corrigir um dado, abra uma issue: https://github.com/codigo-publico-brasil/nocargo/issues/new?template=correcao.yml
+
+Código e dados curados: https://github.com/codigo-publico-brasil/nocargo. Um projeto do Código Público Brasil: https://codigo-publico-brasil.github.io
