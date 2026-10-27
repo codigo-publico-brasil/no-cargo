@@ -49,3 +49,9 @@ Ver [docs/publicacao.md](docs/publicacao.md).
 - `src/nocargo/seo.py`: canônico, compartilhamento, dados estruturados, robots, sitemap e llms.txt.
 - `src/nocargo/static/`: `style.css` (mobile primeiro) e `app.js` (filtro e ordem das listas).
 - `tests/`: um warehouse pequeno, inventado, com o esquema `marts`.
+
+## Licenças
+
+- **Código:** AGPL-3.0 (arquivo `LICENSE`).
+- **Dados curados que o site mostra:** CC BY 4.0. Cada dado vem de uma fonte oficial (TSE, Câmara dos Deputados, Senado Federal), que mantém as próprias condições de uso; o site sempre mostra a origem e a data de captura. Cite a fonte ao reutilizar.
+- **Fontes tipográficas** em `src/nocargo/static/fonts/`: SIL Open Font License 1.1, com os avisos em `LICENSES.md` na mesma pasta.
