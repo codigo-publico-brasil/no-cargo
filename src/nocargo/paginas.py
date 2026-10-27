@@ -96,7 +96,8 @@ def pagina(
         f"<p>Dados oficiais: {fontes}.</p>"
         f'<p class="links"><a href="{raiz}index.html">Início</a><a href="{raiz}cargos.html">Entenda os cargos</a><a href="{raiz}como-calculamos.html">Como calculamos e de onde vêm os dados</a>'
         f'<a href="{correcao}">Encontrou um erro? Abra uma issue &#8599;</a><a href="{REPO}">Código no GitHub &#8599;</a></p></div></footer>\n'
-        f'<script src="{raiz}app.js" defer></script>\n</body>\n</html>\n'
+        + tag_em_construcao(raiz, correcao)
+        + f'<script src="{raiz}app.js" defer></script>\n</body>\n</html>\n'
     )
 
 
@@ -149,6 +150,18 @@ def indice_dos_poderes() -> str:
             f'<a href="#poder-{ID_DO_PODER[n]}">{nome.removeprefix("Poder ")}</a>' for n, nome, *_ in PODERES
         )
         + "</nav>"
+    )
+
+
+def tag_em_construcao(raiz: str, correcao: str) -> str:
+    """A tag que flutua no canto de toda página; aberta, diz o que falta e que os dados ainda estão em validação (sem JavaScript)."""
+    return (
+        '<details class="obra-flutuante"><summary>Em construção</summary><div>'
+        "<p><b>Este site está em construção e os dados ainda estão em validação.</b> Pode haver erros e lacunas.</p>"
+        "<p>Prefeitos, vereadores e o Judiciário ainda não aparecem aqui. O que já está no site vem de fonte oficial, "
+        "com a data de captura ao lado.</p>"
+        f'<p><a href="{raiz}como-calculamos.html">Como calculamos</a> &middot; <a href="{correcao}">Encontrou um erro?</a></p>'
+        "</div></details>\n"
     )
 
 
@@ -552,31 +565,54 @@ def links_oficiais(valor: str | None) -> str:
     )
 
 
+def grade(
+    linhas: tuple[tuple[str, str], ...],
+    largos: tuple[str, ...] = (),
+    numeros: tuple[str, ...] = (),
+    duas: bool = False,
+) -> str:
+    """Rótulo pequeno em cima e valor embaixo, em colunas (3 no computador, 2 no celular); `Sem dado` aparece apagado.
+    Os rótulos em `largos` ocupam a linha inteira."""
+
+    def classe(rotulo: str, valor: str) -> str:
+        nomes = [
+            "vazio" if "Sem dado" in valor and "<" not in valor else "",
+            "num" if rotulo in numeros else "",
+        ]
+        return f' class="{" ".join(n for n in nomes if n)}"' if any(nomes) else ""
+
+    return (
+        f'<dl class="grade{" duas" if duas else ""}">'
+        + "".join(
+            f"<div{' class=largo' if rotulo in largos else ''}><dt>{rotulo}</dt><dd{classe(rotulo, valor)}>{valor}</dd></div>"
+            for rotulo, valor in linhas
+        )
+        + "</dl>"
+    )
+
+
 def sobre_a_pessoa(r: Row) -> str:
     """Quem é, no bloco do título: o nome completo vem do TSE; o resto, do cadastro da Câmara ou do Senado (só quem já é pessoa do projeto)."""
     casa = {"camara": "Câmara dos Deputados", "senado": "Senado Federal"}.get(str(r["fonte_cadastro"]))
     naturalidade = ", ".join(x for x in (r["municipio_nascimento"], r["uf_nascimento"]) if x)
     profissoes = ", ".join(x.strip() for x in str(r["profissoes"] or "").split(";") if x.strip())
     linhas = (
-        ("Nome completo", vazio_ou(r["nome"])),
+        ("Nome completo", vazio_ou(r["nome_civil"] or r["nome"])),
         ("Nascimento", data_curta(r["dt_nascimento"]) if r["dt_nascimento"] else "Sem dado"),
         ("Naturalidade", vazio_ou(naturalidade)),
         ("Profissões", vazio_ou(profissoes)),
         ("Site", links_oficiais(r["site_url"])),
         ("Rede social", links_oficiais(r["rede_social_url"])),
     )
-    cadastro = (
-        f"cadastro da {casa}"
-        + (f", capturado em {data_curta(r['dt_captura_cadastro'])}" if r["dt_captura_cadastro"] else "")
-        if casa
-        else "cadastro da Câmara ou do Senado, que ainda não está ligado a esta pessoa"
-    )
-    return (
-        '<dl class="sobre">'
-        + "".join(f"<div><dt>{rotulo}</dt><dd>{valor}</dd></div>" for rotulo, valor in linhas)
-        + "</dl>"
-        f'<p class="nota">Nome completo: TSE, capturado em {data_curta(r["dt_captura"])}. Os demais dados: {cadastro}.</p>'
-    )
+    capturado = f", capturado em {data_curta(r['dt_captura_cadastro'])}" if r["dt_captura_cadastro"] else ""
+    tse = f"TSE, capturado em {data_curta(r['dt_captura'])}"
+    if not casa:
+        fonte = f"Nome completo: {tse}. Os demais dados: cadastro da Câmara ou do Senado, que ainda não está ligado a esta pessoa."
+    elif r["nome_civil"]:
+        fonte = f"Fonte: cadastro da {casa}{capturado}."
+    else:
+        fonte = f"Nome completo: {tse}. Os demais dados: cadastro da {casa}{capturado}."
+    return grade(linhas, largos=("Nome completo",), numeros=("Nascimento",)) + f'<p class="nota">{fonte}</p>'
 
 
 def ficha(
@@ -676,19 +712,18 @@ def ficha(
         if r["tipo_mandato"] == "novato"
         else ""
     )
-    campanha = "".join(
-        f'<div class="card numero"><span>{rotulo}</span><b title="{e(exato)}">{texto}</b><small>{fonte}</small></div>'
-        for rotulo, texto, exato, fonte in (
-            ("Bens declarados", reais(r["valor_bens"]), r["valor_bens"], "TSE"),
+    campanha = grade(
+        (
             (
                 "Votos",
-                numero(r["qtd_votos"]),
-                "",
-                f"{percentual(r['percentual_votos_nominais'])} dos válidos",
+                f"{numero(r['qtd_votos'])}<small>{percentual(r['percentual_votos_nominais'])} dos válidos</small>",
             ),
-            ("Receitas", reais(r["valor_receitas"]), r["valor_receitas"], "Prestação de contas"),
-            ("Despesas", reais(r["valor_despesas"]), r["valor_despesas"], "Prestação de contas"),
-        )
+            ("Bens declarados", reais(r["valor_bens"])),
+            ("Receita da campanha", reais(r["valor_receitas"])),
+            ("Gasto da campanha", reais(r["valor_despesas"])),
+        ),
+        numeros=("Votos", "Bens declarados", "Receita da campanha", "Gasto da campanha"),
+        duas=True,
     )
     corpo = [
         migalhas(
@@ -708,8 +743,9 @@ def ficha(
         f'<h2>Tempo no cargo e mandatos</h2><div class="card">{tempo_no_cargo}{linha_do_tempo(itens)}'
         '<p class="nota">Mandato exercido, mandato que vai começar e candidatura sem mandato aparecem com marcas diferentes. '
         "Os mandatos da Câmara e do Senado vêm dessas casas; as eleições de outros cargos vêm do TSE e não registram afastamentos.</p></div>",
-        f'<h2>A campanha de {r["ano_eleicao"]}</h2><div class="numeros">{campanha}</div>'
-        '<p class="nota">Quando o dado não foi entregue ao TSE, mostramos Sem dado, nunca zero.</p>',
+        f'<h2>A campanha de {r["ano_eleicao"]}</h2><div class="card">{campanha}</div>'
+        '<p class="nota">Bens: declarados ao TSE. Receita e gasto: prestação de contas ao TSE, com as despesas contratadas. '
+        "Quando o dado não foi entregue, mostramos Sem dado, nunca zero.</p>",
         f'<p class="nota">Fonte: <a href="{e(r["fonte_url"])}">TSE, candidaturas {r["ano_eleicao"]}</a>, capturado em {data_curta(r["dt_captura"])}. '
         f'Veja <a href="../como-calculamos.html">como calculamos</a>. '
         f'Encontrou um erro neste dado? <a href="{seo.link_de_correcao(r["nome_urna"] + ", " + cargo, caminho)}">Abra uma issue</a>.</p>',

@@ -40,7 +40,7 @@ def test_brazil_page_separates_the_three_powers_and_their_spheres(warehouse, tmp
     )
     for esfera in ("Federal", "Estadual", "Municipal"):
         assert esfera in pagina
-    assert pagina.count("Em construção") == 4  # prefeitos, vereadores e os dois blocos do Judiciário
+    assert pagina.count('class="card obra"') == 4  # prefeitos, vereadores e os dois blocos do Judiciário
     assert "Aguardando o resultado do 2º turno" in pagina  # o presidente ainda não tem eleito
 
 
@@ -131,7 +131,12 @@ def test_profile_shows_time_in_office_timeline_and_the_campaign_totals(warehouse
     assert (
         "Próximo mandato" in pagina and "Mandato atual" in pagina and "fev. de 2023 a jan. de 2027" in pagina
     )
-    assert "R$ 1,2 mi" in pagina and "R$ 2,4 mi" in pagina
+    assert (
+        "R$ 1.200.000,00" in pagina
+        and "R$ 2.400.000,00" in pagina
+        and "R$ 2.300.000,00" in pagina
+        and " mi<" not in pagina
+    )
     assert "foto10.jpg" in pagina
 
 
@@ -165,7 +170,8 @@ def test_legislature_dates_stand_in_for_the_missing_mandate_dates(warehouse):
 
 def test_profile_without_data_says_so_instead_of_showing_zero(warehouse, tmp_path):
     pagina = texto(site(warehouse, tmp_path), "pessoa/*-2026-rj-2.html")
-    assert pagina.count(">Sem dado</b>") == 3  # bens, receitas e despesas
+    campanha = pagina.split("A campanha de")[1]
+    assert campanha.count('class="vazio num">Sem dado</dd>') == 3  # bens, receita e gasto
     assert "R$ 0" not in pagina
 
 
@@ -261,8 +267,8 @@ def test_time_in_office_counts_a_chain_of_mandates_and_stops_at_a_gap(warehouse)
 
 
 def test_formatting_helpers():
-    assert formato.reais(None) == "Sem dado" and formato.reais(340000) == "R$ 340 mil"
-    assert formato.reais(1_200_000) == "R$ 1,2 mi" and formato.numero(1234567) == "1.234.567"
+    assert formato.reais(None) == "Sem dado" and formato.reais(340000) == "R$ 340.000,00"
+    assert formato.reais(1_200_000) == "R$ 1.200.000,00" and formato.numero(1234567) == "1.234.567"
     assert formato.tempo(date(2015, 2, 1), date(2026, 10, 25)) == "11 anos e 8 meses"
     assert formato.mes_ano(date(2027, 2, 1)) == "fev. de 2027"
 
@@ -335,7 +341,8 @@ def test_the_person_block_has_the_six_facts_and_short_links(warehouse, tmp_path)
     assert "Quem é</h2>" not in ana and "Na eleição de" not in ana and "No cadastro" not in ana
     bruno = texto(saida, "pessoa/*-2026-rj-2.html")  # sem ligação ao cadastro
     assert (
-        "que ainda não está ligado a esta pessoa" in bruno and "<dt>Nascimento</dt><dd>Sem dado</dd>" in bruno
+        "que ainda não está ligado a esta pessoa" in bruno
+        and '<dt>Nascimento</dt><dd class="vazio num">Sem dado</dd>' in bruno
     )
 
 
@@ -432,3 +439,24 @@ def test_person_pages_have_the_name_in_the_address(warehouse, tmp_path):
     assert (
         "ana-exemplo-2026-rj-1.html" in nomes and "b-carla-b-teste-2026-rj-3.html" in nomes
     )  # a marcação HTML do nome não vira endereço, só letras e números
+
+
+def test_every_page_has_the_floating_em_construcao_tag_saying_data_is_in_validation(warehouse, tmp_path):
+    saida = site(warehouse, tmp_path)
+    for caminho in (
+        "index.html",
+        "estado/RJ.html",
+        "cargos.html",
+        "pessoas.html",
+        "como-calculamos.html",
+        "pessoa/*-2026-rj-1.html",
+    ):
+        pagina = texto(saida, caminho)
+        assert (
+            pagina.count('<details class="obra-flutuante">') == 1
+            and "<summary>Em construção</summary>" in pagina
+        ), caminho
+        assert "os dados ainda estão em validação" in pagina, caminho
+        assert (
+            "ainda não aparecem aqui: as partes" not in pagina
+        )  # o aviso antigo dentro do bloco do título saiu

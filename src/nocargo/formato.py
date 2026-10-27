@@ -57,17 +57,10 @@ def percentual(p: object) -> str:
 
 
 def reais(valor: object) -> str:
-    """Valor abreviado para leitura rápida; o valor exato vai no `title` de quem usa. Vazio é `Sem dado`, nunca zero."""
+    """O valor completo, com centavos (`R$ 2.381.659,40`). Vazio é `Sem dado`, nunca zero."""
     if valor is None:
         return "Sem dado"
-    v = float(str(valor))
-    if v >= 1e9:
-        return f"R$ {v / 1e9:.1f} bi".replace(".", ",")
-    if v >= 1e6:
-        return f"R$ {v / 1e6:.1f} mi".replace(".", ",")
-    if v >= 1e3:
-        return f"R$ {v / 1e3:.0f} mil"
-    return f"R$ {v:.0f}"
+    return "R$ " + f"{float(str(valor)):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 def selo(tipo_mandato: str | None, cargo: str | None = None) -> str:

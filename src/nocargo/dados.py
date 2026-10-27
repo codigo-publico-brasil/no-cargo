@@ -42,7 +42,7 @@ def eleitos(con: Connection, ano: int) -> list[Row]:
         "SELECT e.id_candidatura, e.ano_eleicao, e.uf, e.cargo, e.nome_urna, e.nome, e.partido, e.qtd_votos, "
         "e.percentual_votos_nominais, e.id_pessoa, e.tipo_mandato, e.dt_captura, e.fonte_url, "
         "k.valor_bens, k.valor_receitas, k.valor_despesas, k.fonte_url_bens, k.fonte_url_contas, "
-        "p.foto_url, p.dt_nascimento, p.municipio_nascimento, "
+        "p.foto_url, p.nome_civil, p.dt_nascimento, p.municipio_nascimento, "
         "p.uf_nascimento, p.profissoes, p.site_url, p.rede_social_url, p.fonte AS fonte_cadastro, "
         "p.dt_captura AS dt_captura_cadastro "
         "FROM marts.eleitos e "
