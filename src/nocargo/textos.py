@@ -1,7 +1,14 @@
 """Páginas de texto: o que cada cargo faz e como os dados são tratados. Escritas à mão, iguais para todos os partidos."""
 
 from nocargo import seo
-from nocargo.paginas import PODERES, banda, em_construcao, esfera, faixa_de_titulo, pagina
+from nocargo.paginas import (
+    PODERES,
+    banda,
+    em_construcao,
+    esfera,
+    faixa_de_titulo,
+    pagina,
+)
 
 CARGOS = (
     # poder, nome, o que faz, fatos (rótulo, valor)
@@ -84,6 +91,9 @@ def como_calculamos() -> str:
         '<div class="card"><p><b>Resultado e candidaturas:</b> Tribunal Superior Eleitoral (TSE), dados abertos.</p>'
         "<p><b>Bens, receitas e despesas:</b> declarados pelos candidatos ao TSE. Mostramos só os totais.</p>"
         "<p><b>Mandatos e fotos de quem já exerce mandato:</b> Câmara dos Deputados e Senado Federal, dados abertos.</p></div>"
+        "<h2>Em construção e em validação</h2>"
+        '<div class="card"><p>Este site está em construção e os dados ainda estão em validação: pode haver erros e lacunas. '
+        "Prefeitos, vereadores e o Judiciário ainda não aparecem aqui. Cada dado mostra a fonte oficial e a data de captura, para você conferir.</p></div>"
         "<h2>Provisório e confirmado</h2>"
         '<div class="card aguardando"><p><b>Aguardando resultado:</b> o cargo ainda não tem eleito, por exemplo enquanto o 2º turno não termina.</p></div>'
         '<div class="card"><p><b>Resultado provisório:</b> o TSE já informa o eleito, mas a diplomação, que confirma o resultado, ainda não aconteceu.</p></div>'
