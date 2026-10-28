@@ -17,6 +17,6 @@ Dados atualizados em 25/10/2026. O resultado de 2026 é provisório até a diplo
 - Câmara dos Deputados e Senado Federal, dados abertos: mandatos, votações e fotos.
 
 ## Como citar
-Cite a página e a data de captura. Cada página tem endereço permanente e o texto "Fonte" com o link oficial. Para corrigir um dado, abra uma issue: https://github.com/codigo-publico-brasil/nocargo/issues/new?template=correcao.yml
+Cite a página e a data de captura. Cada página tem endereço permanente e o texto "Fonte" com o link oficial. Para corrigir um dado, abra uma issue: https://github.com/codigo-publico-brasil/no-cargo/issues/new?template=correcao.yml
 
-Código e dados curados: https://github.com/codigo-publico-brasil/nocargo. Um projeto do Código Público Brasil: https://codigo-publico-brasil.github.io
+Código e dados curados: https://github.com/codigo-publico-brasil/no-cargo. Um projeto do Código Público Brasil: https://codigo-publico-brasil.github.io
