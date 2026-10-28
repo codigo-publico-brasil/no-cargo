@@ -247,7 +247,7 @@ wheels = [
 ]
 
 [[package]]
-name = "nocargo"
+name = "no-cargo"
 version = "0.0.0"
 source = { editable = "." }
 dependencies = [

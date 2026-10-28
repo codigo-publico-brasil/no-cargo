@@ -27,10 +27,10 @@ Requisitos: Python 3.13 e [uv](https://docs.astral.sh/uv/). Com os dados já car
 
 ```bash
 uv sync
-uv run nocargo            # escreve o site em dist/
+uv run no-cargo            # escreve o site em dist/
 ```
 
-O arquivo do warehouse vem de `NOCARGO_WAREHOUSE` (padrão: `../dado-publico-brasil/data_store/warehouse.duckdb`; modelo em `.env.example`). Abra `dist/index.html` no navegador.
+O arquivo do warehouse vem de `NO_CARGO_WAREHOUSE` (padrão: `../dado-publico-brasil/data_store/warehouse.duckdb`; modelo em `.env.example`). Abra `dist/index.html` no navegador.
 
 Antes de abrir um PR:
 
@@ -44,14 +44,14 @@ Ver [docs/publicacao.md](docs/publicacao.md).
 
 ## Como é feito
 
-- `src/nocargo/dados.py`: consultas ao esquema `marts` (somente leitura).
-- `src/nocargo/paginas.py` e `textos.py`: as páginas, como texto HTML, sem motor de templates.
-- `src/nocargo/seo.py`: canônico, compartilhamento, dados estruturados, robots, sitemap e llms.txt.
-- `src/nocargo/static/`: `style.css` (mobile primeiro) e `app.js` (filtro e ordem das listas).
+- `src/no_cargo/dados.py`: consultas ao esquema `marts` (somente leitura).
+- `src/no_cargo/paginas.py` e `textos.py`: as páginas, como texto HTML, sem motor de templates.
+- `src/no_cargo/seo.py`: canônico, compartilhamento, dados estruturados, robots, sitemap e llms.txt.
+- `src/no_cargo/static/`: `style.css` (mobile primeiro) e `app.js` (filtro e ordem das listas).
 - `tests/`: um warehouse pequeno, inventado, com o esquema `marts`.
 
 ## Licenças
 
 - **Código:** AGPL-3.0 (arquivo `LICENSE`).
 - **Dados curados que o site mostra:** CC BY 4.0. Cada dado vem de uma fonte oficial (TSE, Câmara dos Deputados, Senado Federal), que mantém as próprias condições de uso; o site sempre mostra a origem e a data de captura. Cite a fonte ao reutilizar.
-- **Fontes tipográficas** em `src/nocargo/static/fonts/`: SIL Open Font License 1.1, com os avisos em `LICENSES.md` na mesma pasta.
+- **Fontes tipográficas** em `src/no_cargo/static/fonts/`: SIL Open Font License 1.1, com os avisos em `LICENSES.md` na mesma pasta.

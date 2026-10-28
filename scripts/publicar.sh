@@ -4,7 +4,7 @@
 #      scripts/publicar.sh --sem-push gera e commita num clone temporário, sem enviar (para conferir)
 set -euo pipefail
 
-REPO="https://github.com/codigo-publico-brasil/nocargo.git"
+REPO="https://github.com/codigo-publico-brasil/no-cargo.git"
 raiz="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$raiz"
 
@@ -15,19 +15,19 @@ if [ "$branch" != "main" ] && [ "${1:-}" != "--sem-push" ]; then
 fi
 commit="$(git rev-parse --short HEAD)"
 
-uv run nocargo                                   # escreve dist/ a partir do warehouse
+uv run no-cargo                                   # escreve dist/ a partir do warehouse
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 git clone --quiet --branch gh-pages --single-branch "$REPO" "$tmp/site"
 find "$tmp/site" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
-cp -R dist/. "$tmp/site/"
+(cd dist && tar --exclude=.git -cf - .) | tar -xf - -C "$tmp/site"  # sem o .git que o dist possa ter
 cd "$tmp/site"
 git add -A
 if git diff --cached --quiet; then
   echo "Nada mudou: o site publicado já é este."
   exit 0
 fi
-git commit --quiet -m "Publica o site" -m "Gerado com uv run nocargo a partir da $branch ($commit)."
+git commit --quiet -m "Publica o site" -m "Gerado com uv run no-cargo a partir da $branch ($commit)."
 if [ "${1:-}" = "--sem-push" ]; then
   echo "Commit pronto em $tmp/site (não enviado)."
   git --no-pager log --stat --oneline -1 | tail -3

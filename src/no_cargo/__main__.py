@@ -1,8 +1,8 @@
 """Gera o site estático.
 
 Uso (depois de rodar a plataforma de dados):
-    uv run nocargo                                   # escreve em dist/
-    uv run nocargo --warehouse caminho/warehouse.duckdb --saida dist
+    uv run no-cargo                                   # escreve em dist/
+    uv run no-cargo --warehouse caminho/warehouse.duckdb --saida dist
 
 O warehouse é aberto em modo somente leitura. Um arquivo DuckDB aceita um escritor por vez: com a plataforma
 carregando dados, a geração falha até ela terminar.
@@ -17,10 +17,10 @@ from pathlib import Path
 
 import duckdb
 
-from nocargo import dados, paginas, seo, textos
-from nocargo.formato import arquivo_da_ficha
+from no_cargo import dados, paginas, seo, textos
+from no_cargo.formato import arquivo_da_ficha
 
-ENV_WAREHOUSE = "NOCARGO_WAREHOUSE"
+ENV_WAREHOUSE = "NO_CARGO_WAREHOUSE"
 DEFAULT_WAREHOUSE = "../dado-publico-brasil/data_store/warehouse.duckdb"
 ESTATICOS = Path(__file__).parent / "static"
 

@@ -4,10 +4,10 @@ import re
 from datetime import date
 from pathlib import Path
 
-from nocargo import cores, dados, formato, seo
-from nocargo.__main__ import construir
-from nocargo.cores import SEM_COR
-from nocargo.paginas import FONTES, REPO, SITE_MAE, sem_acento
+from no_cargo import cores, dados, formato, seo
+from no_cargo.__main__ import construir
+from no_cargo.cores import SEM_COR
+from no_cargo.paginas import FONTES, REPO, SITE_MAE, sem_acento
 
 HOJE = date(2026, 10, 25)
 
@@ -105,7 +105,7 @@ def test_hemicycle_dots_stay_inside_the_drawing_and_never_overlap_for_any_size()
 
 
 def test_person_list_badges_are_not_overridden_by_the_gray_text_rule():
-    css = (Path(__file__).parent.parent / "src" / "nocargo" / "static" / "style.css").read_text(
+    css = (Path(__file__).parent.parent / "src" / "no_cargo" / "static" / "style.css").read_text(
         encoding="utf-8"
     )
     assert ".pessoa .dados>span:not(.selo)" in css  # a regra do texto cinza não pode pintar o selo
