@@ -35,13 +35,14 @@ def construir(con: dados.Connection, saida: Path, hoje: date | None = None) -> i
     hoje = hoje or date.today()
     ano = dados.ultimo_ano(con)
     eleitos = dados.eleitos(con, ano)
+    atuais = dados.em_exercicio(con, ano, hoje, eleitos)
     situacao = dados.situacao_dos_cargos(con, ano)
     capturado = max((r["dt_captura"] for r in situacao if r["dt_captura"]), default=None)
     saida.mkdir(parents=True, exist_ok=True)
     shutil.copytree(ESTATICOS, saida, dirs_exist_ok=True)  # css, js, símbolo e fontes (arquivos binários)
     escritas: list[str] = ["index.html", "pessoas.html", "cargos.html", "como-calculamos.html"]
     escrever(saida / "index.html", paginas.brasil(ano, eleitos, situacao, capturado))
-    escrever(saida / "pessoas.html", paginas.pessoas(ano, eleitos, capturado))
+    escrever(saida / "pessoas.html", paginas.pessoas(ano, eleitos, capturado, atuais))
     escrever(saida / "cargos.html", textos.cargos())
     escrever(saida / "como-calculamos.html", textos.como_calculamos())
     total = 4
@@ -49,7 +50,7 @@ def construir(con: dados.Connection, saida: Path, hoje: date | None = None) -> i
         escrever(saida / "estado" / f"{uf}.html", paginas.estado(uf, ano, eleitos, situacao, capturado))
         escritas.append(f"estado/{uf}.html")
         total += 1
-    for r in eleitos:
+    for r in [*eleitos, *atuais]:
         mandatos = dados.mandatos(con, r["id_pessoa"]) if r["id_pessoa"] else []
         candidaturas = dados.candidaturas(con, r["id_pessoa"]) if r["id_pessoa"] else []
         vistas = {(c["ano_eleicao"], c["cargo"]) for c in candidaturas}

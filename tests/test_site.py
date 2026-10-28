@@ -30,7 +30,9 @@ def test_the_site_has_the_main_pages_one_page_per_state_and_one_per_elected(ware
     for pagina in ("index.html", "cargos.html", "como-calculamos.html", "style.css", "app.js"):
         assert (saida / pagina).exists()
     assert len(list((saida / "estado").glob("*.html"))) == 27
-    assert len(list((saida / "pessoa").glob("*.html"))) == 8
+    assert (
+        len(list((saida / "pessoa").glob("*.html"))) == 8 + 3
+    )  # os 8 eleitos de 2026 e os 3 que ainda estão no mandato de antes
 
 
 def test_brazil_page_separates_the_three_powers_and_their_spheres(warehouse, tmp_path):
@@ -362,7 +364,9 @@ def test_the_people_page_lists_everyone_elected_in_alphabetical_order_without_ra
     nomes = re.findall(
         r'<a class="pessoa linha" href="pessoa/[^"]+"[^>]*><span class="dados"><b>(.*?)</b>', pagina
     )
-    total = warehouse.execute("SELECT count(*) FROM marts.eleitos").fetchone()[0]
+    total = (
+        warehouse.execute("SELECT count(*) FROM marts.eleitos WHERE ano_eleicao = 2026").fetchone()[0] + 3
+    )  # mais os 3 em mandato
     assert len(nomes) == total and nomes == sorted(nomes, key=lambda n: sem_acento(html.unescape(n)))
     assert "&lt;b&gt;Carla&lt;/b&gt; Teste" in pagina  # nomes escapados
     assert "SP" in pagina and "Elisa Ficticia" in pagina  # de qualquer estado
@@ -460,3 +464,74 @@ def test_every_page_has_the_floating_em_construcao_tag_saying_data_is_in_validat
         assert (
             "ainda não aparecem aqui: as partes" not in pagina
         )  # o aviso antigo dentro do bloco do título saiu
+
+
+def test_the_people_page_includes_whoever_is_still_in_office_from_earlier_elections(warehouse, tmp_path):
+    saida = site(warehouse, tmp_path)
+    pagina = texto(saida, "pessoas.html")
+    for nome in ("Gil Anterior", "Gov Anterior", "Sena Antiga"):  # mandato ainda em curso em 2026
+        assert f"<b>{nome}</b>" in pagina, nome
+    assert "Dep Velho" not in pagina  # o mandato de 2018 terminou em 2022
+    assert (
+        pagina.count("<b>Ana Exemplo</b>") == 1 and pagina.count("<b>Elisa Ficticia</b>") == 1
+    )  # reeleito conta uma vez
+    assert "eleito em 2022" in pagina and 'data-grupo="atual"' in pagina and 'data-grupo="novo"' in pagina
+    assert "Em mandato, eleitos antes (3)" in pagina and "Eleitos em 2026 (8)" in pagina
+
+
+def test_a_person_still_in_office_gets_a_page_with_the_current_mandate_and_no_provisional_result(
+    warehouse, tmp_path
+):
+    saida = site(warehouse, tmp_path)
+    pagina = texto(saida, "pessoa/gil-anterior-2022-rj-201.html")
+    assert "Mandato em curso" in pagina and "De 2023 a 2026, 4 anos" in pagina and "Mandato atual" in pagina
+    assert "Resultado provisório" not in pagina and "Próximo mandato" not in pagina
+    senador = texto(saida, "pessoa/sena-antiga-2018-rj-203.html")
+    assert "De 2019 a 2026, 8 anos" in senador
+
+
+def test_the_menu_starts_with_inicio_and_marks_it_on_the_home(warehouse, tmp_path):
+    saida = site(warehouse, tmp_path)
+    for caminho, marcado in (("index.html", True), ("pessoas.html", False), ("estado/RJ.html", False)):
+        pagina = texto(saida, caminho)
+        topo = pagina[pagina.index('<nav class="nav"') : pagina.index("</nav>")]
+        assert topo.index(">Início<") < topo.index(">Pessoas<"), caminho
+        assert ('aria-current="page">Início</a>' in topo) is marcado, caminho
+
+
+def test_the_national_office_has_no_fake_state_in_the_breadcrumb_header_or_list(warehouse, tmp_path):
+    warehouse.execute(
+        "INSERT INTO marts.eleitos (id_candidatura, ano_eleicao, uf, ue, cargo, nome_urna, nome, partido, qtd_votos,"
+        " percentual_votos_nominais, id_pessoa, tipo_mandato, dt_captura, fonte_url, id_pessoa_tse)"
+        " VALUES ('2022:BR:301', 2022, 'BR', 'BR', 'Presidente', 'Pres Anterior', 'Pres Anterior', 'Partido J', 1000, 50.9,"
+        " NULL, NULL, DATE '2026-10-24', 'https://dadosabertos.tse.jus.br/dataset/candidatos-2022', 903)"
+    )
+    saida = site(warehouse, tmp_path)
+    pagina = texto(saida, "pessoa/pres-anterior-2022-br-301.html")
+    assert (
+        "estado/BR.html" not in pagina
+        and "Presidente &middot; Brasil" in pagina
+        and "presidente do Brasil" in pagina
+    )
+    assert (
+        pagina.count("Mandato em curso") == 2
+    )  # a etiqueta e o título do bloco; o período aparece uma vez, no mandato atual
+    assert "Presidente &middot; Brasil &middot; Partido J" in texto(saida, "pessoas.html")
+
+
+def test_who_has_no_register_uses_the_tse_profession_and_birth_state(warehouse, tmp_path):
+    saida = site(warehouse, tmp_path)
+    bruno = texto(
+        saida, "pessoa/bruno-modelo-2026-rj-2.html"
+    )  # sem cadastro: ocupação e UF de nascimento do TSE
+    assert (
+        "<dt>Profissões</dt><dd>Engenheiro</dd>" in bruno
+        and "<dt>Naturalidade</dt><dd>Minas Gerais</dd>" in bruno
+    )
+    assert "Nome completo, profissão e estado de nascimento: TSE" in bruno
+    ana = texto(saida, "pessoa/ana-exemplo-2026-rj-1.html")  # com cadastro: nada vem do TSE além da eleição
+    assert (
+        "Advogada, professora" in ana
+        and "Fonte: cadastro da Câmara dos Deputados" in ana
+        and "estado de nascimento" not in ana
+    )
