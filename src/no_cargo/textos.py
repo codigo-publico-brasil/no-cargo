@@ -1,7 +1,7 @@
 """Páginas de texto: o que cada cargo faz e como os dados são tratados. Escritas à mão, iguais para todos os partidos."""
 
-from nocargo import seo
-from nocargo.paginas import (
+from no_cargo import seo
+from no_cargo.paginas import (
     PODERES,
     banda,
     em_construcao,

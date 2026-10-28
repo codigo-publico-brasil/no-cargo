@@ -7,9 +7,9 @@ from datetime import date
 from html import escape
 from urllib.parse import quote
 
-SITE = os.environ.get("NOCARGO_URL", "https://nocargo.codigopublicobrasil.com.br").rstrip("/")
+SITE = os.environ.get("NO_CARGO_URL", "https://nocargo.codigopublicobrasil.com.br").rstrip("/")
 SITE_MAE = "https://codigo-publico-brasil.github.io"
-REPO = "https://github.com/codigo-publico-brasil/nocargo"
+REPO = "https://github.com/codigo-publico-brasil/no-cargo"
 NOME = "No Cargo"
 
 # Rastreadores de IA que o site aceita de propósito. O robots.txt é um pedido, não uma trava.

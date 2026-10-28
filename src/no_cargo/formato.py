@@ -6,7 +6,7 @@ import unicodedata
 from datetime import date
 from html import escape
 
-from nocargo.cores import SEM_COR, cor_do_partido
+from no_cargo.cores import SEM_COR, cor_do_partido
 
 MESES = ["jan.", "fev.", "mar.", "abr.", "mai.", "jun.", "jul.", "ago.", "set.", "out.", "nov.", "dez."]
 

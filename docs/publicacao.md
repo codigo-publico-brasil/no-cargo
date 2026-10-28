@@ -12,11 +12,11 @@ scripts/publicar.sh --sem-push   # só confere: gera e commita num clone tempor�
 ```
 
 O script recusa publicar fora da `main`. O histórico do `gh-pages` é mantido; cada publicação é um commit.
-Para testar em outro endereço: `NOCARGO_URL=https://exemplo.org uv run nocargo`.
+Para testar em outro endereço: `NO_CARGO_URL=https://exemplo.org uv run no-cargo`.
 
 ## Uma vez só
 
-Feito em 27 e 28/10/2026: repositório público com licença AGPL-3.0, Pages na branch `gh-pages`, domínio `nocargo.codigopublicobrasil.com.br`, `CNAME nocargo → codigo-publico-brasil.github.io` no DNS e Enforce HTTPS.
+Feito em 27 e 28/10/2026: repositório público com licença AGPL-3.0, Pages na branch `gh-pages`, domínio `nocargo.codigopublicobrasil.com.br`, `CNAME no_cargo → codigo-publico-brasil.github.io` no DNS e Enforce HTTPS.
 
 Falta: Google Search Console e Bing Webmaster (verificar o domínio com um registro TXT no DNS e enviar `sitemap.xml`).
 
