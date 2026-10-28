@@ -318,21 +318,32 @@ def sem_acento(texto: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFD", texto.lower()) if not unicodedata.combining(c))
 
 
+def nome_do_local(uf: str) -> str:
+    """`BR` é o cargo nacional (presidente), que não é um estado."""
+    return "Brasil" if uf == "BR" else UFS.get(uf, (uf,))[0]
+
+
 def linha_de_pessoa(r: Row) -> str:
-    nome_uf = UFS.get(r["uf"], (r["uf"],))[0]
+    nome_uf = nome_do_local(r["uf"])
     return (
         f'<a class="pessoa linha" href="pessoa/{arquivo_da_ficha(r["nome_urna"], r["id_candidatura"])}" data-nome="{e(sem_acento(str(r["nome_urna"])))}" '
-        f'data-partido="{e(sem_acento(str(r["partido"])))}" data-cargo="{e(r["cargo"])}" data-uf="{e(r["uf"])}" '
+        f'data-partido="{e(sem_acento(str(r["partido"])))}" data-cargo="{e(r["cargo"])}" data-uf="{e(r["uf"])}" data-grupo="{"atual" if r.get("em_exercicio") else "novo"}" '
         f'data-local="{e(sem_acento(f"{r['cargo']} {r['uf']} {nome_uf}"))}"><span class="dados"><b>{e(r["nome_urna"])}</b>'
-        f"<span>{e(r['cargo'])} &middot; {e(r['uf'])} &middot; {e(r['partido'])}</span></span>"
+        f"<span>{e(r['cargo'])} &middot; {e(r['uf'] if r['uf'] != 'BR' else 'Brasil')} &middot; {e(r['partido'])} &middot; eleito em {r['ano_eleicao']}</span></span>"
         '<i aria-hidden="true">&#8250;</i></a>'
     )
 
 
-def pessoas(ano: int, eleitos: list[Row], capturado: date | None) -> str:
-    """Todas as pessoas eleitas, de qualquer cargo e estado, em ordem alfabética; o JS só filtra e ordena."""
-    todos = sorted(eleitos, key=lambda r: (sem_acento(str(r["nome_urna"])), str(r["id_candidatura"])))
+def pessoas(
+    ano: int, eleitos: list[Row], capturado: date | None, em_exercicio: list[Row] | None = None
+) -> str:
+    """Os eleitos do ano e quem ainda está no mandato de uma eleição anterior, de qualquer cargo e estado, em ordem alfabética; o JS só filtra e ordena."""
+    todos = sorted(
+        [*eleitos, *(em_exercicio or [])],
+        key=lambda r: (sem_acento(str(r["nome_urna"])), str(r["id_candidatura"])),
+    )
     contagem = Counter(r["cargo"] for r in todos)
+    atuais = len(em_exercicio or [])
     botoes_cargo = (
         '<button type="button" class="filtro" data-cargo="" aria-pressed="true">Todos</button>'
         + "".join(
@@ -344,6 +355,10 @@ def pessoas(ano: int, eleitos: list[Row], capturado: date | None) -> str:
     controles = (
         '<div class="card controles"><label class="so-leitor" for="busca">Buscar por nome, partido ou estado</label>'
         '<input id="busca" type="search" placeholder="Nome, partido ou estado" autocomplete="off">'
+        f'<div class="filtros" role="group" aria-label="Situação">'
+        '<button type="button" class="filtro" data-grupo="" aria-pressed="true">Todos</button>'
+        f'<button type="button" class="filtro" data-grupo="novo" aria-pressed="false">Eleitos em {ano} ({numero(len(eleitos))})</button>'
+        f'<button type="button" class="filtro" data-grupo="atual" aria-pressed="false">Em mandato, eleitos antes ({numero(atuais)})</button></div>'
         f'<div class="filtros" role="group" aria-label="Cargo">{botoes_cargo}</div>'
         '<div class="filtros" role="group" aria-label="Ordenar"><span>Ordenar por</span>'
         '<button type="button" class="filtro" data-ordem="nome" aria-pressed="true">Nome</button>'
@@ -355,7 +370,7 @@ def pessoas(ano: int, eleitos: list[Row], capturado: date | None) -> str:
         faixa_de_titulo(
             "Pessoas · todo o Brasil",
             "Todas as pessoas eleitas",
-            f"Quem foi eleito em {ano}, de todos os cargos e estados, em ordem alfabética. Procure por nome, partido ou estado.",
+            f"Quem foi eleito em {ano} e quem ainda está no mandato de uma eleição anterior, de todos os cargos e estados, em ordem alfabética. Procure por nome, partido ou estado.",
             aviso_provisorio(capturado),
         ),
         f'<div class="secao"><div class="lista" data-filtravel>{controles}<div class="itens lista-linhas">'
@@ -366,7 +381,7 @@ def pessoas(ano: int, eleitos: list[Row], capturado: date | None) -> str:
         "Todas as pessoas eleitas",
         chr(10).join(corpo),
         "pessoas",
-        descricao=f"As {numero(len(todos))} pessoas eleitas em {ano}, de todos os cargos e estados.",
+        descricao=f"As {numero(len(todos))} pessoas eleitas em {ano} ou ainda no mandato de eleições anteriores, de todos os cargos e estados.",
         caminho="pessoas.html",
     )
 
@@ -597,6 +612,14 @@ def sobre_a_pessoa(r: Row) -> str:
     casa = {"camara": "Câmara dos Deputados", "senado": "Senado Federal"}.get(str(r["fonte_cadastro"]))
     naturalidade = ", ".join(x for x in (r["municipio_nascimento"], r["uf_nascimento"]) if x)
     profissoes = ", ".join(x.strip() for x in str(r["profissoes"] or "").split(";") if x.strip())
+    # quem não tem cadastro usa o que o TSE registra: a ocupação declarada e a UF de nascimento (o TSE não dá o município)
+    profissao_tse = not profissoes and bool(r.get("ocupacao"))
+    if profissao_tse:
+        profissoes = str(r["ocupacao"]).capitalize()
+    uf_tse = str(r.get("uf_nascimento_tse") or "")
+    estado_tse = not naturalidade and uf_tse in UFS
+    if estado_tse:
+        naturalidade = UFS[uf_tse][0]
     linhas = (
         ("Nome completo", vazio_ou(r["nome_civil"] or r["nome"])),
         ("Nascimento", data_curta(r["dt_nascimento"]) if r["dt_nascimento"] else "Sem dado"),
@@ -606,13 +629,24 @@ def sobre_a_pessoa(r: Row) -> str:
         ("Rede social", links_oficiais(r["rede_social_url"])),
     )
     capturado = f", capturado em {data_curta(r['dt_captura_cadastro'])}" if r["dt_captura_cadastro"] else ""
-    tse = f"TSE, capturado em {data_curta(r['dt_captura'])}"
+    do_tse = [
+        x
+        for x, vem in (
+            ("nome completo", not (casa and r["nome_civil"])),
+            ("profissão", profissao_tse),
+            ("estado de nascimento", estado_tse),
+        )
+        if vem
+    ]
+    tse = f"{', '.join(do_tse[:-1])} e {do_tse[-1]}" if len(do_tse) > 1 else "".join(do_tse)
+    de_tse = f"{tse.capitalize()}: TSE, capturado em {data_curta(r['dt_captura'])}. " if do_tse else ""
     if not casa:
-        fonte = f"Nome completo: {tse}. Os demais dados: cadastro da Câmara ou do Senado, que ainda não está ligado a esta pessoa."
-    elif r["nome_civil"]:
-        fonte = f"Fonte: cadastro da {casa}{capturado}."
+        do_cadastro = (
+            "Os demais dados: cadastro da Câmara ou do Senado, que ainda não está ligado a esta pessoa."
+        )
     else:
-        fonte = f"Nome completo: {tse}. Os demais dados: cadastro da {casa}{capturado}."
+        do_cadastro = f"{'Os demais dados' if do_tse else 'Fonte'}: cadastro da {casa}{capturado}."
+    fonte = de_tse + do_cadastro
     return grade(linhas, largos=("Nome completo",), numeros=("Nascimento",)) + f'<p class="nota">{fonte}</p>'
 
 
@@ -625,14 +659,33 @@ def ficha(
     inicio = (
         r["ano_eleicao"] + 1
     )  # a posse é no início do ano seguinte; a data exata não vem de fonte confiável
-    itens: list[tuple[str, str, str, str]] = [
-        (
-            "proximo",
-            "Próximo mandato",
-            f"De {inicio} a {inicio + anos - 1}, {anos} anos",
-            f"Eleito em {r['ano_eleicao']}, resultado provisório. Os mandatos vão do início ao fim do ano.",
+    atual = bool(r.get("em_exercicio"))  # eleito antes e ainda no mandato, fora da lista dos eleitos do ano
+    oficial_em_curso = any(m["dt_fim"] is None or m["dt_fim"] >= hoje for m in mandatos_da_pessoa)
+    itens: list[tuple[str, str, str, str]]
+    if (
+        atual
+    ):  # o mandato em curso previsto; quem tem mandato na Câmara ou no Senado já o vê abaixo, com a fonte
+        itens = (
+            []
+            if oficial_em_curso
+            else [
+                (
+                    "atual",
+                    "Mandato atual",
+                    f"De {inicio} a {inicio + anos - 1}, {anos} anos",
+                    f"Eleito em {r['ano_eleicao']}. Previsto pelo resultado do TSE, que não registra afastamentos nem suplentes que assumiram.",
+                )
+            ]
         )
-    ]
+    else:
+        itens = [
+            (
+                "proximo",
+                "Próximo mandato",
+                f"De {inicio} a {inicio + anos - 1}, {anos} anos",
+                f"Eleito em {r['ano_eleicao']}, resultado provisório. Os mandatos vão do início ao fim do ano.",
+            )
+        ]
     passado: list[
         tuple[int, tuple[str, str, str, str]]
     ] = []  # (ano, item): do mais recente para o mais antigo
@@ -682,7 +735,10 @@ def ficha(
         )
     itens += [item for _, item in sorted(passado, key=lambda x: -x[0])]
     ja_eleito = any(str(c["resultado"] or "").lower().startswith("eleito") for c in candidaturas_da_pessoa)
-    if r["tipo_mandato"] == "novato":  # pessoa ligada, sem mandato anterior na casa
+    if atual:
+        sem_tempo = "Mandato em curso"
+        sem_tempo_nota = "Previsto pelo resultado do TSE; o resultado não registra afastamentos nem suplentes que assumiram."
+    elif r["tipo_mandato"] == "novato":  # pessoa ligada, sem mandato anterior na casa
         sem_tempo, sem_tempo_nota = "Ainda não tomou posse", f"A posse é em {inicio}."
     elif ja_eleito:
         sem_tempo = "Já foi eleito antes"
@@ -710,7 +766,7 @@ def ficha(
             else ""
         )
         + "</p></div>"
-        if r["tipo_mandato"] == "novato"
+        if r["tipo_mandato"] == "novato" and not atual
         else ""
     )
     campanha = grade(
@@ -730,15 +786,19 @@ def ficha(
         migalhas(
             [
                 ("Brasil", "../index.html"),
-                (UFS.get(r["uf"], (r["uf"],))[0], f"../estado/{r['uf']}.html"),
+                *([] if r["uf"] == "BR" else [(nome_do_local(r["uf"]), f"../estado/{r['uf']}.html")]),
                 (str(r["nome_urna"]), None),
             ]
         ),
         '<section class="heroi ficha">',
         f'<div class="cabeca">{foto(r["foto_url"], r["nome_urna"], 104)}<div><h1>{e(r["nome_urna"])}</h1>'
-        f'<p>{e(cargo)} &middot; {e(r["uf"])}</p><p class="partido">Partido {e(r["partido"])}</p></div></div>'
-        f'<div class="selos">{selo(r["tipo_mandato"], cargo)}<span class="selo provisorio">Resultado provisório</span></div>'
-        f"{sobre_a_pessoa(r)}</section>",
+        f'<p>{e(cargo)} &middot; {e(r["uf"] if r["uf"] != "BR" else "Brasil")}</p><p class="partido">Partido {e(r["partido"])}</p></div></div>'
+        + (
+            '<div class="selos"><span class="selo semselo">Mandato em curso</span></div>'
+            if atual
+            else f'<div class="selos">{selo(r["tipo_mandato"], cargo)}<span class="selo provisorio">Resultado provisório</span></div>'
+        )
+        + f"{sobre_a_pessoa(r)}</section>",
         '<div class="secao">',
         aviso_novato,
         f'<h2>Tempo no cargo e mandatos</h2><div class="card">{tempo_no_cargo}{linha_do_tempo(itens)}'
@@ -752,14 +812,15 @@ def ficha(
         f'Encontrou um erro neste dado? <a href="{seo.link_de_correcao(r["nome_urna"] + ", " + cargo, caminho)}">Abra uma issue</a>.</p>',
         "</div>",
     ]
-    estado = UFS.get(r["uf"], (r["uf"],))[0]
+    estado = nome_do_local(r["uf"])
+    onde = "do Brasil" if r["uf"] == "BR" else f"por {estado}"
     return pagina(
         f"{r['nome_urna']}, {cargo}",
         "\n".join(corpo),
         "brasil",
         raiz="../",
         descricao=(
-            f"{r['nome_urna']}, {cargo.lower()} por {estado} ({r['partido']}), eleição de {r['ano_eleicao']}: "
+            f"{r['nome_urna']}, {cargo.lower()} {onde} ({r['partido']}), eleição de {r['ano_eleicao']}: "
             "mandatos, candidaturas, votos e campanha, com a fonte oficial."
         ),
         caminho=caminho,
@@ -768,7 +829,11 @@ def ficha(
                 r["nome_urna"], cargo, r["partido"], estado, caminho, r["fonte_url"], r["dt_captura"]
             ),
             seo.migalhas(
-                [("Brasil", "index.html"), (estado, f"estado/{r['uf']}.html"), (r["nome_urna"], caminho)]
+                [
+                    ("Brasil", "index.html"),
+                    *([] if r["uf"] == "BR" else [(estado, f"estado/{r['uf']}.html")]),
+                    (r["nome_urna"], caminho),
+                ]
             ),
         ],
     )

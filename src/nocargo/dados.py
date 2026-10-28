@@ -34,9 +34,7 @@ def ultimo_ano(con: Connection) -> int:
     return int(found[0])
 
 
-def eleitos(con: Connection, ano: int) -> list[Row]:
-    """Eleitos das eleições gerais do ano, com o total da campanha e a foto. Ordem alfabética."""
-    marcadores = ", ".join("?" for _ in CARGOS)
+def _eleitos(con: Connection, onde: str, args: tuple[object, ...]) -> list[Row]:
     return rows(
         con,
         "SELECT e.id_candidatura, e.ano_eleicao, e.uf, e.cargo, e.nome_urna, e.nome, e.partido, e.qtd_votos, "
@@ -44,14 +42,40 @@ def eleitos(con: Connection, ano: int) -> list[Row]:
         "k.valor_bens, k.valor_receitas, k.valor_despesas, k.fonte_url_bens, k.fonte_url_contas, "
         "p.foto_url, p.nome_civil, p.dt_nascimento, p.municipio_nascimento, "
         "p.uf_nascimento, p.profissoes, p.site_url, p.rede_social_url, p.fonte AS fonte_cadastro, "
-        "p.dt_captura AS dt_captura_cadastro "
+        "p.dt_captura AS dt_captura_cadastro, e.id_pessoa_tse, e.ocupacao, e.uf_nascimento AS uf_nascimento_tse "
         "FROM marts.eleitos e "
         "LEFT JOIN marts.eleitos_campanhas k USING (id_candidatura) "
         "LEFT JOIN marts.pessoas p ON p.id_pessoa = e.id_pessoa "
-        f"WHERE e.ano_eleicao = ? AND e.cargo IN ({marcadores}) "
+        f"WHERE {onde} "
         "ORDER BY e.uf, e.cargo, e.nome_urna, e.id_candidatura",
-        (ano, *CARGOS),
+        args,
     )
+
+
+def eleitos(con: Connection, ano: int) -> list[Row]:
+    """Eleitos das eleições gerais do ano, com o total da campanha e a foto. Ordem alfabética."""
+    marcadores = ", ".join("?" for _ in CARGOS)
+    return _eleitos(con, f"e.ano_eleicao = ? AND e.cargo IN ({marcadores})", (ano, *CARGOS))
+
+
+def em_exercicio(con: Connection, ano: int, hoje: date, eleitos_do_ano: list[Row]) -> list[Row]:
+    """Quem foi eleito antes de `ano` e ainda está no mandato previsto (4 anos; 8 para senador), e não está entre os
+    eleitos do ano. O período vem da lei aplicada ao resultado do TSE: o resultado não registra afastamentos nem
+    suplentes que assumiram. Cada linha leva `em_exercicio = True`."""
+    marcadores = ", ".join("?" for _ in CARGOS)
+    candidatos = _eleitos(
+        con,
+        f"e.ano_eleicao < ? AND e.cargo IN ({marcadores}) AND e.ano_eleicao + 1 <= ? "
+        "AND ? <= e.ano_eleicao + CASE WHEN e.cargo = 'Senador' THEN 8 ELSE 4 END",
+        (ano, *CARGOS, hoje.year, hoje.year),
+    )
+    do_ano_tse = {r["id_pessoa_tse"] for r in eleitos_do_ano if r["id_pessoa_tse"]}
+    do_ano = {r["id_pessoa"] for r in eleitos_do_ano if r["id_pessoa"]}
+    return [
+        {**r, "em_exercicio": True}
+        for r in candidatos
+        if r["id_pessoa_tse"] not in do_ano_tse and r["id_pessoa"] not in do_ano
+    ]
 
 
 def situacao_dos_cargos(con: Connection, ano: int) -> list[Row]:

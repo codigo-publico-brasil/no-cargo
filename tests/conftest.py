@@ -10,7 +10,8 @@ ELEITOS = """
 CREATE TABLE marts.eleitos (
     id_candidatura varchar, ano_eleicao integer, uf varchar, ue varchar, cargo varchar, nome_urna varchar,
     nome varchar, partido varchar, qtd_votos bigint, percentual_votos_nominais decimal(5, 2), id_pessoa bigint,
-    tipo_mandato varchar, dt_captura date, fonte_url varchar
+    tipo_mandato varchar, dt_captura date, fonte_url varchar, id_pessoa_tse bigint,
+    ocupacao varchar, uf_nascimento varchar
 )"""
 CAMPANHAS = """
 CREATE TABLE marts.eleitos_campanhas (
@@ -87,8 +88,64 @@ def warehouse(tmp_path) -> Iterator[duckdb.DuckDBPyConnection]:
         con.execute(ddl)
     for id_, uf, cargo, urna, partido, votos, pessoa, tipo in PESSOAS_ELEITAS:
         con.execute(
-            "INSERT INTO marts.eleitos VALUES (?, 2026, ?, ?, ?, ?, ?, ?, ?, 10.5, ?, ?, ?, ?)",
+            "INSERT INTO marts.eleitos VALUES (?, 2026, ?, ?, ?, ?, ?, ?, ?, 10.5, ?, ?, ?, ?, NULL, NULL, NULL)",
             (id_, uf, uf, cargo, urna, urna, partido, votos, pessoa, tipo, CAPTURA, URL),
+        )
+    # Bruno não tem cadastro: a profissão e o estado de nascimento vêm do TSE
+    con.execute(
+        "UPDATE marts.eleitos SET ocupacao = 'ENGENHEIRO', uf_nascimento = 'MG' WHERE id_candidatura = '2026:RJ:2'"
+    )
+    # Elisa foi eleita também em 2022 (mesma pessoa do TSE): quem foi reeleito aparece uma vez só
+    con.execute("UPDATE marts.eleitos SET id_pessoa_tse = 77 WHERE id_candidatura = '2026:SP:6'")
+    for id_, ano, uf, cargo, urna, partido, pessoa, tse in (
+        (
+            "2022:RJ:201",
+            2022,
+            "RJ",
+            "Deputado estadual",
+            "Gil Anterior",
+            "Partido F",
+            None,
+            900,
+        ),  # ainda no mandato
+        ("2022:RJ:202", 2022, "RJ", "Governador", "Gov Anterior", "Partido G", None, 901),  # ainda no mandato
+        ("2018:RJ:203", 2018, "RJ", "Senador", "Sena Antiga", "Partido H", None, 902),  # 8 anos: até 2026
+        (
+            "2018:RJ:204",
+            2018,
+            "RJ",
+            "Deputado estadual",
+            "Dep Velho",
+            "Partido I",
+            None,
+            903,
+        ),  # terminou em 2022
+        (
+            "2022:RJ:205",
+            2022,
+            "RJ",
+            "Deputado federal",
+            "Ana Exemplo",
+            "Partido A",
+            10,
+            None,
+        ),  # reeleita em 2026
+        (
+            "2022:SP:206",
+            2022,
+            "SP",
+            "Deputado estadual",
+            "Elisa Ficticia",
+            "Partido D",
+            None,
+            77,
+        ),  # reeleita em 2026
+    ):
+        con.execute(
+            "INSERT INTO marts.eleitos (id_candidatura, ano_eleicao, uf, ue, cargo, nome_urna, nome, partido, qtd_votos,"
+            " percentual_votos_nominais, id_pessoa, tipo_mandato, dt_captura, fonte_url, id_pessoa_tse)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1000, 1.5, ?, NULL, ?, ?, ?)",
+            (id_, ano, uf, uf, cargo, urna, urna, partido, pessoa, CAPTURA, URL, tse),
         )
     # só a primeira pessoa tem total de campanha; as demais ficam sem dado (vazio, não zero)
     con.execute(
