@@ -4,20 +4,21 @@ O site é estático e gerado localmente a partir do DuckDB da plataforma, então
 
 ## Publicar
 
+Com o warehouse da plataforma parado (o DuckDB aceita um escritor por vez) e a `main` atualizada:
+
 ```bash
-uv run nocargo                       # gera dist/ (com CNAME, robots.txt, sitemap.xml, llms.txt, 404.html)
-git -C dist init -b gh-pages && git -C dist add -A && git -C dist commit -m "Publica o site"
-git -C dist push -f https://github.com/codigo-publico-brasil/nocargo.git gh-pages
+scripts/publicar.sh              # gera dist/, commita em cima do gh-pages e envia (sem push forçado)
+scripts/publicar.sh --sem-push   # só confere: gera e commita num clone temporário, sem enviar
 ```
 
+O script recusa publicar fora da `main`. O histórico do `gh-pages` é mantido; cada publicação é um commit.
 Para testar em outro endereço: `NOCARGO_URL=https://exemplo.org uv run nocargo`.
 
 ## Uma vez só
 
-1. Repositório público (o GitHub Pages grátis exige) com licença definida (issues #32 e #33).
-2. Settings, Pages: Source = branch `gh-pages`, domínio `nocargo.codigopublicobrasil.com.br`, Enforce HTTPS.
-3. DNS: `CNAME nocargo → codigo-publico-brasil.github.io`.
-4. Google Search Console e Bing Webmaster: verificar o domínio (registro TXT no DNS) e enviar `sitemap.xml`.
+Feito em 27 e 28/10/2026: repositório público com licença AGPL-3.0, Pages na branch `gh-pages`, domínio `nocargo.codigopublicobrasil.com.br`, `CNAME nocargo → codigo-publico-brasil.github.io` no DNS e Enforce HTTPS.
+
+Falta: Google Search Console e Bing Webmaster (verificar o domínio com um registro TXT no DNS e enviar `sitemap.xml`).
 
 ## Como o site é achado
 
