@@ -45,6 +45,7 @@ PODERES = (
 )  # fmt: skip
 
 NAV = (
+    ("inicio", "Início", "index.html"),
     ("pessoas", "Pessoas", "pessoas.html"),
     ("cargos", "Cargos", "cargos.html"),
     ("como", "Origens", "como-calculamos.html"),
@@ -299,7 +300,7 @@ def brasil(ano: int, eleitos: list[Row], situacao: list[Row], capturado: date | 
     return pagina(
         "Brasil",
         "\n".join(corpo),
-        "brasil",
+        "inicio",
         descricao=f"Quem foi eleito em {ano}: composição de cada casa por partido, pelos três poderes, com a fonte oficial ao lado.",
         caminho="index.html",
         schema=[seo.site_schema()],

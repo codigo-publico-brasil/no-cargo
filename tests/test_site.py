@@ -460,3 +460,12 @@ def test_every_page_has_the_floating_em_construcao_tag_saying_data_is_in_validat
         assert (
             "ainda não aparecem aqui: as partes" not in pagina
         )  # o aviso antigo dentro do bloco do título saiu
+
+
+def test_the_menu_starts_with_inicio_and_marks_it_on_the_home(warehouse, tmp_path):
+    saida = site(warehouse, tmp_path)
+    for caminho, marcado in (("index.html", True), ("pessoas.html", False), ("estado/RJ.html", False)):
+        pagina = texto(saida, caminho)
+        topo = pagina[pagina.index('<nav class="nav"') : pagina.index("</nav>")]
+        assert topo.index(">Início<") < topo.index(">Pessoas<"), caminho
+        assert ('aria-current="page">Início</a>' in topo) is marcado, caminho
