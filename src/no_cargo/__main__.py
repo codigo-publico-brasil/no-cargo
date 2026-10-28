@@ -22,6 +22,8 @@ from no_cargo.formato import arquivo_da_ficha
 
 ENV_WAREHOUSE = "NO_CARGO_WAREHOUSE"
 DEFAULT_WAREHOUSE = "../dado-publico-brasil/data_store/warehouse.duckdb"
+ENV_FOTOS = "NO_CARGO_FOTOS"
+DEFAULT_FOTOS = "../dado-publico-brasil/data_store/fotos"  # <ano>/<UF>/<sequencial>.jpg, como o TSE publica
 ESTATICOS = Path(__file__).parent / "static"
 
 
@@ -30,7 +32,24 @@ def escrever(caminho: Path, texto: str) -> None:
     caminho.write_text(texto, encoding="utf-8")
 
 
-def construir(con: dados.Connection, saida: Path, hoje: date | None = None) -> int:
+def trazer_fotos(eleitos: list[dados.Row], ano: int, origem: Path | None, saida: Path) -> int:
+    """Copia para o site a foto oficial (TSE) de cada eleito do ano e marca a linha com o caminho: as fotos
+    são servidas pelo próprio site, nunca de outro domínio. Quem não tem arquivo segue sem `foto_local`."""
+    if origem is None:
+        return 0
+    trazidas = 0
+    for r in eleitos:
+        arquivo = origem / str(ano) / str(r["uf"]) / f"{str(r['id_candidatura']).rsplit(':', 1)[-1]}.jpg"
+        if arquivo.is_file():
+            destino = Path("fotos") / str(ano) / str(r["uf"]) / arquivo.name
+            (saida / destino).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(arquivo, saida / destino)
+            r["foto_local"] = destino.as_posix()
+            trazidas += 1
+    return trazidas
+
+
+def construir(con: dados.Connection, saida: Path, hoje: date | None = None, fotos: Path | None = None) -> int:
     """Escreve o site em `saida` e devolve quantas páginas gerou."""
     hoje = hoje or date.today()
     ano = dados.ultimo_ano(con)
@@ -40,6 +59,7 @@ def construir(con: dados.Connection, saida: Path, hoje: date | None = None) -> i
     capturado = max((r["dt_captura"] for r in situacao if r["dt_captura"]), default=None)
     saida.mkdir(parents=True, exist_ok=True)
     shutil.copytree(ESTATICOS, saida, dirs_exist_ok=True)  # css, js, símbolo e fontes (arquivos binários)
+    trazer_fotos(eleitos, ano, fotos, saida)
     escritas: list[str] = ["index.html", "pessoas.html", "cargos.html", "como-calculamos.html"]
     escrever(saida / "index.html", paginas.brasil(ano, eleitos, situacao, capturado))
     escrever(saida / "pessoas.html", paginas.pessoas(ano, eleitos, capturado, atuais))
@@ -80,10 +100,16 @@ def main() -> None:
         "--warehouse", type=Path, default=Path(os.environ.get(ENV_WAREHOUSE, DEFAULT_WAREHOUSE))
     )
     parser.add_argument("--saida", type=Path, default=Path("dist"))
+    parser.add_argument(
+        "--fotos",
+        type=Path,
+        default=Path(os.environ.get(ENV_FOTOS, DEFAULT_FOTOS)),
+        help="pasta das fotos do TSE",
+    )
     args = parser.parse_args()
     con = duckdb.connect(str(args.warehouse), read_only=True)
     try:
-        total = construir(con, args.saida)
+        total = construir(con, args.saida, fotos=args.fotos if args.fotos.is_dir() else None)
     finally:
         con.close()
     print(f"{total} páginas em {args.saida}")

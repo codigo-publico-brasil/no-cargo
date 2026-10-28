@@ -423,7 +423,7 @@ def cartao_de_pessoa(r: Row) -> str:
     return (
         f'<a class="card pessoa" href="../pessoa/{arquivo_da_ficha(r["nome_urna"], r["id_candidatura"])}" data-nome="{e(str(r["nome_urna"]).lower())}" '
         f'data-partido="{e(str(r["partido"]).lower())}" data-tipo="{e(r["tipo_mandato"] or "sem")}" '
-        f'data-votos="{r["qtd_votos"] or 0}">{foto(r["foto_url"], r["nome_urna"], 60)}'
+        f'data-votos="{r["qtd_votos"] or 0}">{foto(r["foto_url"], r["nome_urna"], 60, r.get("foto_local"), "../")}'
         f'<span class="dados"><b>{e(r["nome_urna"])}</b><span>{detalhe}</span>{selo(r["tipo_mandato"], r["cargo"])}</span>'
         '<i aria-hidden="true">&#8250;</i></a>'
     )
@@ -791,7 +791,7 @@ def ficha(
             ]
         ),
         '<section class="heroi ficha">',
-        f'<div class="cabeca">{foto(r["foto_url"], r["nome_urna"], 104)}<div><h1>{e(r["nome_urna"])}</h1>'
+        f'<div class="cabeca">{foto(r["foto_url"], r["nome_urna"], 104, r.get("foto_local"), "../")}<div><h1>{e(r["nome_urna"])}</h1>'
         f'<p>{e(cargo)} &middot; {e(r["uf"] if r["uf"] != "BR" else "Brasil")}</p><p class="partido">Partido {e(r["partido"])}</p></div></div>'
         + (
             '<div class="selos"><span class="selo semselo">Mandato em curso</span></div>'
@@ -808,7 +808,8 @@ def ficha(
         '<p class="nota">Bens: declarados ao TSE. Receita e gasto: prestação de contas ao TSE, com as despesas contratadas. '
         "Quando o dado não foi entregue, mostramos Sem dado, nunca zero.</p>",
         f'<p class="nota">Fonte: <a href="{e(r["fonte_url"])}">TSE, candidaturas {r["ano_eleicao"]}</a>, capturado em {data_curta(r["dt_captura"])}. '
-        f'Veja <a href="../como-calculamos.html">como calculamos</a>. '
+        + ("Foto: TSE, do registro da candidatura. " if r.get("foto_local") else "")
+        + f'Veja <a href="../como-calculamos.html">como calculamos</a>. '
         f'Encontrou um erro neste dado? <a href="{seo.link_de_correcao(r["nome_urna"] + ", " + cargo, caminho)}">Abra uma issue</a>.</p>',
         "</div>",
     ]

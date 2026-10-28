@@ -535,3 +535,26 @@ def test_who_has_no_register_uses_the_tse_profession_and_birth_state(warehouse, 
         and "Fonte: cadastro da Câmara dos Deputados" in ana
         and "estado de nascimento" not in ana
     )
+
+
+def test_photos_of_the_year_are_copied_and_served_from_the_site_itself(warehouse, tmp_path):
+    origem = tmp_path / "fotos"
+    (origem / "2026" / "RJ").mkdir(parents=True)
+    (origem / "2026" / "RJ" / "1.jpg").write_bytes(b"\xff\xd8jpeg")  # Ana, 2026:RJ:1
+    saida = tmp_path / "dist"
+    construir(warehouse, saida, HOJE, fotos=origem)
+    assert (saida / "fotos" / "2026" / "RJ" / "1.jpg").read_bytes() == b"\xff\xd8jpeg"
+    ana = texto(saida, "pessoa/ana-exemplo-2026-rj-1.html")
+    assert (
+        'src="../fotos/2026/RJ/1.jpg"' in ana and "foto10.jpg" not in ana and "Foto: TSE" in ana
+    )  # a local vale primeiro
+    assert 'src="../fotos/2026/RJ/1.jpg"' in texto(saida, "estado/RJ.html")
+    bruno = texto(saida, "pessoa/bruno-modelo-2026-rj-2.html")  # sem arquivo: segue o desenho de reserva
+    assert "Sem foto" in bruno and "Foto: TSE" not in bruno
+    assert len(list((saida / "fotos").rglob("*.jpg"))) == 1
+
+
+def test_without_a_photos_folder_nothing_is_copied_and_the_page_keeps_the_register_photo(warehouse, tmp_path):
+    saida = site(warehouse, tmp_path)
+    assert not (saida / "fotos").exists()
+    assert "foto10.jpg" in texto(saida, "pessoa/ana-exemplo-2026-rj-1.html")

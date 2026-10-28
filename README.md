@@ -32,6 +32,8 @@ uv run no-cargo            # escreve o site em dist/
 
 O arquivo do warehouse vem de `NO_CARGO_WAREHOUSE` (padrão: `../dado-publico-brasil/data_store/warehouse.duckdb`; modelo em `.env.example`). Abra `dist/index.html` no navegador.
 
+As fotos oficiais do TSE vêm de `NO_CARGO_FOTOS` (padrão: `../dado-publico-brasil/data_store/fotos`, no formato `<ano>/<UF>/<sequencial>.jpg`). O site copia para `dist/fotos/` só a foto de cada eleito do ano e serve do próprio domínio; sem a pasta, gera sem elas.
+
 Antes de abrir um PR:
 
 ```bash
