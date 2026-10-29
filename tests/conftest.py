@@ -11,7 +11,7 @@ CREATE TABLE marts.eleitos (
     id_candidatura varchar, ano_eleicao integer, uf varchar, ue varchar, cargo varchar, nome_urna varchar,
     nome varchar, partido varchar, qtd_votos bigint, percentual_votos_nominais decimal(5, 2), id_pessoa bigint,
     tipo_mandato varchar, dt_captura date, fonte_url varchar, id_pessoa_tse bigint,
-    ocupacao varchar, uf_nascimento varchar
+    ocupacao varchar, uf_nascimento varchar, turno integer DEFAULT 1
 )"""
 CAMPANHAS = """
 CREATE TABLE marts.eleitos_campanhas (
@@ -88,7 +88,7 @@ def warehouse(tmp_path) -> Iterator[duckdb.DuckDBPyConnection]:
         con.execute(ddl)
     for id_, uf, cargo, urna, partido, votos, pessoa, tipo in PESSOAS_ELEITAS:
         con.execute(
-            "INSERT INTO marts.eleitos VALUES (?, 2026, ?, ?, ?, ?, ?, ?, ?, 10.5, ?, ?, ?, ?, NULL, NULL, NULL)",
+            "INSERT INTO marts.eleitos VALUES (?, 2026, ?, ?, ?, ?, ?, ?, ?, 10.5, ?, ?, ?, ?, NULL, NULL, NULL, 1)",
             (id_, uf, uf, cargo, urna, urna, partido, votos, pessoa, tipo, CAPTURA, URL),
         )
     # Bruno não tem cadastro: a profissão e o estado de nascimento vêm do TSE

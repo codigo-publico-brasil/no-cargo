@@ -2,12 +2,6 @@
 (function () {
   function norm(t) { return t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""); }
 
-  function ativar(grupo, atributo, valor) {
-    grupo.querySelectorAll("button[" + atributo + "]").forEach(function (b) {
-      b.setAttribute("aria-pressed", String(b.getAttribute(atributo) === valor));
-    });
-  }
-
   document.querySelectorAll("[data-filtravel]").forEach(function (lista) {
     var busca = lista.querySelector("input");
     var itens = Array.prototype.slice.call(lista.querySelectorAll(".pessoa"));
@@ -41,34 +35,42 @@
     }
 
     busca.addEventListener("input", aplicar);
-    lista.querySelectorAll("button[data-tipo]").forEach(function (b) {
-      b.addEventListener("click", function () { estado.tipo = b.dataset.tipo; ativar(lista, "data-tipo", estado.tipo); aplicar(); });
-    });
-    lista.querySelectorAll("button[data-cargo]").forEach(function (b) {
-      b.addEventListener("click", function () { estado.cargo = b.dataset.cargo; ativar(lista, "data-cargo", estado.cargo); aplicar(); });
-    });
     lista.querySelectorAll("button[data-grupo]").forEach(function (b) {
-      b.addEventListener("click", function () { estado.grupo = b.dataset.grupo; ativar(lista, "data-grupo", estado.grupo); aplicar(); });
+      b.addEventListener("click", function () {
+        estado.grupo = b.dataset.grupo;
+        b.parentNode.querySelectorAll("button").forEach(function (o) { o.setAttribute("aria-pressed", String(o === b)); });
+        aplicar();
+      });
     });
-    lista.querySelectorAll("button[data-ordem]").forEach(function (b) {
-      b.addEventListener("click", function () { estado.ordem = b.dataset.ordem; ativar(lista, "data-ordem", estado.ordem); aplicar(); });
-    });
+    var porTipo = lista.querySelector("#filtro-tipo");
+    if (porTipo) { porTipo.addEventListener("change", function () { estado.tipo = porTipo.value; aplicar(); }); }
+    var porCargo = lista.querySelector("#filtro-cargo");
+    if (porCargo) { porCargo.addEventListener("change", function () { estado.cargo = porCargo.value; aplicar(); }); }
+    var porOrdem = lista.querySelector("#filtro-ordem");
+    if (porOrdem) { porOrdem.addEventListener("change", function () { estado.ordem = porOrdem.value; aplicar(); }); }
     aplicar();
   });
 
+  // Busca de estado pelo nome ou pela sigla; sem JavaScript o campo fica escondido e a grade inteira aparece.
   var estados = document.getElementById("estados");
-  if (estados) {
-    var campo = document.getElementById("busca-estado");
-    var regiao = "Todas";
-    var filtrar = function () {
-      var termo = norm(campo.value.trim());
-      estados.querySelectorAll("li").forEach(function (li) {
-        li.hidden = !((regiao === "Todas" || li.dataset.regiao === regiao) && (!termo || norm(li.dataset.nome).indexOf(termo) >= 0));
+  var campoEstado = document.getElementById("busca-estado");
+  if (estados && campoEstado) {
+    campoEstado.parentNode.hidden = false;
+    var avisoEstado = campoEstado.parentNode.querySelector(".contagem");
+    campoEstado.addEventListener("input", function () {
+      var termo = norm(campoEstado.value.trim());
+      var visiveis = 0;
+      estados.querySelectorAll(".estados").forEach(function (lista) {
+        var algum = false;
+        lista.querySelectorAll("li").forEach(function (li) {
+          var ok = !termo || li.dataset.nome.indexOf(termo) >= 0;
+          li.hidden = !ok;
+          if (ok) { algum = true; visiveis += 1; }
+        });
+        lista.hidden = !algum;
+        lista.previousElementSibling.hidden = !algum;
       });
-    };
-    campo.addEventListener("input", filtrar);
-    document.querySelectorAll("button[data-regiao]").forEach(function (b) {
-      b.addEventListener("click", function () { regiao = b.dataset.regiao; ativar(b.parentNode, "data-regiao", regiao); filtrar(); });
+      avisoEstado.textContent = visiveis === 0 ? "Nenhum estado encontrado. Tente outro nome ou a sigla." : "";
     });
   }
 
