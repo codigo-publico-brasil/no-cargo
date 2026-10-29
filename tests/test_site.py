@@ -1,7 +1,7 @@
 import html
 import json
 import re
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from no_cargo import cores, dados, formato, seo
@@ -347,13 +347,13 @@ def test_the_person_block_has_the_six_facts_and_short_links(warehouse, tmp_path)
     )
 
 
-def test_the_menu_has_origens_and_a_round_github_button_and_the_home_has_the_powers_index(
-    warehouse, tmp_path
-):
+def test_the_menu_has_no_origens_the_footer_does_and_the_home_has_the_powers_index(warehouse, tmp_path):
     saida = site(warehouse, tmp_path)
     brasil = texto(saida, "index.html")
     topo = brasil[brasil.index('<header class="topo">') : brasil.index("</header>")]
-    assert ">Origens</a>" in topo and "Método" not in topo and 'class="gh"' in topo and REPO in topo
+    nav = topo[topo.index('<nav class="nav"') : topo.index("</nav>")]
+    assert ">Origens<" not in nav and "Método" not in topo and 'class="gh"' in topo and REPO in topo
+    assert ">Origens dos dados</a>" in brasil[brasil.index('<footer class="rodape">') :]
     assert 'href="#poder-executivo"' in brasil and "Poder 1" not in brasil and "poder-num" not in brasil
 
 
@@ -433,7 +433,7 @@ def test_the_site_publishes_robots_sitemap_llms_404_and_the_domain_for_github_pa
 def test_a_person_page_links_to_a_prefilled_correction_issue(warehouse, tmp_path):
     ficha = texto(site(warehouse, tmp_path), "pessoa/*-2026-rj-1.html")
     assert f"{REPO}/issues/new?template=correcao.yml" in ficha and "pagina=https%3A%2F%2F" in ficha
-    assert "Encontrou um erro neste dado?" in ficha
+    assert "Encontrou um erro?" in ficha
 
 
 def test_person_pages_have_the_name_in_the_address(warehouse, tmp_path):
@@ -624,3 +624,13 @@ def test_the_states_page_has_a_search_box_that_only_shows_with_javascript(wareho
     estados = texto(saida, "estados.html")
     assert 'id="busca-estado"' in estados and 'class="busca-estado" hidden' in estados
     assert 'data-nome="sao paulo sp"' in estados and "busca-estado" in texto(saida, "app.js")
+
+
+def test_the_home_shows_when_the_site_was_updated_and_the_shortcuts_come_before_the_power_buttons(
+    warehouse, tmp_path
+):
+    saida = tmp_path / "dist"
+    construir(warehouse, saida, hoje=date(2026, 10, 29), agora=datetime(2026, 10, 29, 14, 32))
+    inicio = texto(saida, "index.html")
+    assert "Site atualizado em 29/10/2026 às 14:32" in inicio
+    assert inicio.index('class="atalhos"') < inicio.index('class="indice"')

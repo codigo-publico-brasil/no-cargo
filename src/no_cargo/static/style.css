@@ -173,3 +173,9 @@ main{max-width:var(--larg);margin:0 auto;padding:0 var(--gut)}
 @media (min-width:600px){.atalhos{grid-template-columns:1fr 1fr}}
 .busca-estado input{width:100%;min-height:52px;padding:0 16px;font:inherit;font-size:18px;border:1px solid var(--borda);border-radius:12px;background:var(--surface);color:var(--ink)}
 .busca-estado[hidden],.estados li[hidden],.estados[hidden],.regiao[hidden]{display:none}
+.grade dd small{white-space:normal}
+.indice{justify-content:center}
+.card.presidente{color:var(--ink);text-decoration:none}.card.presidente:hover{border-color:var(--green-ink)}
+.card.presidente p{margin:2px 0 0;font-size:16px}.card.presidente>div{flex:1;min-width:0}
+.card.presidente i{font-size:24px;color:var(--green-ink);font-style:normal}
+.atalhos{margin-bottom:4px}

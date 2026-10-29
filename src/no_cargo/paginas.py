@@ -3,7 +3,7 @@
 import re
 import unicodedata
 from collections import Counter
-from datetime import date
+from datetime import date, datetime
 
 from no_cargo import seo
 from no_cargo.dados import CARGOS, EXECUTIVO, LEGISLATIVO, Row
@@ -49,7 +49,6 @@ NAV = (
     ("estados", "Estados", "estados.html"),
     ("pessoas", "Pessoas", "pessoas.html"),
     ("cargos", "Cargos", "cargos.html"),
-    ("como", "Origens", "como-calculamos.html"),
 )
 SITE_MAE = "https://codigo-publico-brasil.github.io"
 ICONE_GITHUB = "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
@@ -96,7 +95,7 @@ def pagina(
         '<footer class="rodape"><div><b>No Cargo</b>'
         f'<p>Um projeto do <a href="{SITE_MAE}">Código Público Brasil</a>. Código sob AGPL-3.0; dados curados sob CC BY 4.0.</p>'
         f"<p>Dados oficiais: {fontes}.</p>"
-        f'<p class="links"><a href="{raiz}index.html">Brasil</a><a href="{raiz}cargos.html">Entenda os cargos</a><a href="{raiz}como-calculamos.html">Como calculamos e de onde vêm os dados</a>'
+        f'<p class="links"><a href="{raiz}index.html">Brasil</a><a href="{raiz}cargos.html">Entenda os cargos</a><a href="{raiz}como-calculamos.html">Origens dos dados</a>'
         f'<a href="{correcao}">Encontrou um erro? Abra uma issue &#8599;</a><a href="{REPO}">Código no GitHub &#8599;</a></p></div></footer>\n'
         + tag_em_construcao(raiz, correcao)
         + f'<script src="{raiz}app.js" defer></script>\n</body>\n</html>\n'
@@ -138,7 +137,7 @@ def migalhas(itens: list[tuple[str, str | None]]) -> str:
 def aviso_provisorio(capturado: date | None) -> str:
     return (
         '<p class="aviso"><span class="selo provisorio">Resultado provisório</span> '
-        f"TSE, capturado em {data_curta(capturado)}. O resultado só é confirmado na diplomação.</p>"
+        f"TSE, capturado em {data_curta(capturado)}.</p>"
     )
 
 
@@ -224,16 +223,25 @@ def contar(eleitos: list[Row], cargos: tuple[str, ...]) -> Counter[str]:
 
 def _card_do_presidente(r: Row) -> str:
     """Foto, partido e votos de quem foi eleito presidente, com link para a ficha."""
+    turno = f" &middot; {r['turno']}º turno" if r.get("turno") else ""
     return (
-        '<div class="card presidente">'
-        + foto(r["foto_url"], r["nome_urna"], 88, r.get("foto_local"))
-        + f"<div><h3>Presidente da República</h3><p><b>{e(r['nome_urna'])}</b>, {e(r['partido'])}.</p>"
-        f"<p>{numero(r['qtd_votos'])} votos, {base_do_percentual(r)}. Eleito em {r['ano_eleicao']}.</p>"
-        f'<p><a href="pessoa/{arquivo_da_ficha(r["nome_urna"], r["id_candidatura"])}">Ver a ficha completa</a></p></div></div>'
+        '<a class="card presidente" href="pessoa/'
+        + arquivo_da_ficha(r["nome_urna"], r["id_candidatura"])
+        + '">'
+        + foto(r["foto_url"], r["nome_urna"], 72, r.get("foto_local"))
+        + f"<div><h3>Presidente da República</h3><p><b>{e(r['nome_urna'])}</b> &middot; {e(r['partido'])}</p>"
+        f"<p>{numero(r['qtd_votos'])} votos &middot; {percentual(r['percentual_votos_nominais'])}{turno}</p></div>"
+        '<i aria-hidden="true">&#8250;</i></a>'
     )
 
 
-def brasil(ano: int, eleitos: list[Row], situacao: list[Row], capturado: date | None) -> str:
+def brasil(
+    ano: int,
+    eleitos: list[Row],
+    situacao: list[Row],
+    capturado: date | None,
+    atualizado: datetime | None = None,
+) -> str:
     governos = [s for s in situacao if s["cargo"] == "Governador"]
     pend = sum(int(s["qtd_pendentes"]) for s in governos)
     presidente = [r for r in eleitos if r["cargo"] == "Presidente"]
@@ -252,11 +260,16 @@ def brasil(ano: int, eleitos: list[Row], situacao: list[Row], capturado: date | 
         faixa_de_titulo(
             "A composição do poder no Brasil",
             "Quem está no cargo",
-            f"Os eleitos nas eleições gerais de {ano}, pelos três poderes, de cima para baixo: federal, estadual e municipal.",
-            aviso_provisorio(capturado),
+            f"Eleitos em {ano}, nos três poderes.",
+            aviso_provisorio(capturado)
+            + (
+                f'<p class="aviso">Site atualizado em {data_curta(atualizado)} às {atualizado:%H:%M}.</p>'
+                if atualizado
+                else ""
+            ),
         ),
-        indice_dos_poderes(),
         atalhos_da_home(),
+        indice_dos_poderes(),
         '<div class="secao">',
         banda(*PODERES[0]),
         esfera("Federal", "Todo o Brasil"),
@@ -373,7 +386,7 @@ def pessoas(
         faixa_de_titulo(
             "Pessoas · todo o Brasil",
             "Todas as pessoas eleitas",
-            f"Quem foi eleito em {ano} e quem ainda está no mandato de uma eleição anterior, de todos os cargos e estados, em ordem alfabética. Procure por nome, partido ou estado.",
+            f"Quem foi eleito em {ano} e quem segue no mandato de uma eleição anterior.",
             aviso_provisorio(capturado),
         ),
         f'<div class="secao"><div class="lista" data-filtravel>{controles}<div class="itens lista-linhas">'
@@ -584,7 +597,7 @@ def barra_de_mandato(rotulo: str, de: date, ate: date, hoje: date) -> str:
     return (
         f'<div class="mandato{" futuro" if hoje < de else ""}"><div class="titulo"><b>{e(rotulo)}</b><span>{periodo}</span></div>'
         f'<progress max="100" value="{pct}" aria-label="{e(rotulo)}: {pct}% cumprido">{pct}%</progress>'
-        f'<div class="legenda-barra"><span>{"ainda não começou" if hoje < de else f"{pct}% cumprido"}</span><span>{situacao}</span></div></div>'
+        f'<div class="legenda-barra"><span>{situacao if hoje < de else f"{pct}% cumprido"}</span><span>{"" if hoje < de else situacao}</span></div></div>'
     )
 
 
@@ -872,15 +885,13 @@ def ficha(
         '<div class="secao">',
         aviso_novato,
         f'<h2>Tempo no cargo e mandatos</h2><div class="card">{tempo_no_cargo}{linha_do_tempo(itens)}'
-        '<p class="nota">Mandato exercido, mandato que vai começar e candidatura sem mandato aparecem com marcas diferentes. '
-        "Os mandatos da Câmara e do Senado vêm dessas casas; as eleições de outros cargos vêm do TSE e não registram afastamentos.</p></div>",
+        '<p class="nota">Mandatos da Câmara e do Senado vêm dessas casas; os demais, do TSE.</p></div>',
         f'<h2>A campanha de {r["ano_eleicao"]}</h2><div class="card">{campanha}</div>'
-        '<p class="nota">Bens: declarados ao TSE. Receita e gasto: prestação de contas ao TSE, com as despesas contratadas. '
-        "Quando o dado não foi entregue, mostramos Sem dado, nunca zero.</p>",
+        '<p class="nota">Bens e contas: declarados ao TSE. Sem dado quando não entregue, nunca zero.</p>',
         f'<p class="nota">Fonte: <a href="{e(r["fonte_url"])}">TSE, candidaturas {r["ano_eleicao"]}</a>, capturado em {data_curta(r["dt_captura"])}. '
-        + ("Foto: TSE, do registro da candidatura. " if r.get("foto_local") else "")
-        + f'Veja <a href="../como-calculamos.html">como calculamos</a>. '
-        f'Encontrou um erro neste dado? <a href="{seo.link_de_correcao(r["nome_urna"] + ", " + cargo, caminho)}">Abra uma issue</a>.</p>',
+        + ("Foto: TSE. " if r.get("foto_local") else "")
+        + f'<a href="../como-calculamos.html">Como calculamos</a>. '
+        f'<a href="{seo.link_de_correcao(r["nome_urna"] + ", " + cargo, caminho)}">Encontrou um erro?</a></p>',
         "</div>",
     ]
     estado = nome_do_local(r["uf"])
