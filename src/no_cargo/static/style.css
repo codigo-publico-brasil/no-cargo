@@ -151,7 +151,7 @@ main{max-width:var(--larg);margin:0 auto;padding:0 var(--gut)}
 .selecoes{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
 .selecoes label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
 .selecoes select{min-height:44px;width:100%;padding:0 10px;font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--borda);border-radius:12px}
-.seletor h3{margin:20px 0 8px;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--green-ink)}
+.regiao{margin:24px 0 10px;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--green-ink)}
 .estados{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
 .estados a{display:flex;flex-direction:column;gap:2px;min-height:60px;justify-content:center;padding:8px 14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--ink);text-decoration:none}
 .estados a:hover{border-color:var(--green-ink)}
@@ -167,3 +167,7 @@ main{max-width:var(--larg);margin:0 auto;padding:0 var(--gut)}
 .mandato.futuro progress{outline:1px dashed var(--borda);outline-offset:-1px;background:transparent}.mandato.futuro progress::-webkit-progress-bar{background:transparent}
 .mandato .legenda-barra{display:flex;justify-content:space-between;gap:12px;font-size:15px;color:var(--muted)}
 .card .mandatos+.nota,.card .mandatos+.tempo{margin-top:16px}
+.atalhos{display:grid;grid-template-columns:1fr;gap:10px;margin-top:20px}
+.atalhos a{display:flex;flex-direction:column;gap:2px;color:var(--ink);text-decoration:none;min-height:60px;justify-content:center}
+.atalhos a:hover{border-color:var(--green-ink)}.atalhos b{font-size:18px}.atalhos span{color:var(--muted);font-size:15px}
+@media (min-width:600px){.atalhos{grid-template-columns:1fr 1fr}}

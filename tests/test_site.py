@@ -373,7 +373,7 @@ def test_the_people_page_lists_everyone_elected_in_alphabetical_order_without_ra
         'data-ordem="votos"' not in pagina and "<img" not in pagina.split("<main>")[1]
     )  # sem ordem por votos e sem foto (página leve)
     assert 'data-cargo="Senador"' in pagina and ">Pessoas</a>" in texto(saida, "index.html")
-    assert 'href="pessoas.html">Veja todas' in texto(saida, "index.html")
+    assert 'href="pessoas.html"' in texto(saida, "index.html")
     assert "filtro-cargo" in texto(saida, "app.js")
 
 
@@ -609,7 +609,10 @@ def test_the_timeline_shows_the_party_of_each_past_election(warehouse, tmp_path)
     assert "Pelo Partido B. Fonte: TSE" in pagina
 
 
-def test_the_home_lists_the_states_as_links_by_region_without_a_search_box(warehouse, tmp_path):
-    inicio = texto(site(warehouse, tmp_path), "index.html")
-    assert inicio.count('href="estado/') >= 27 and "<h3>Nordeste</h3>" in inicio
-    assert "busca-estado" not in inicio
+def test_the_states_have_their_own_page_and_the_home_only_links_to_it(warehouse, tmp_path):
+    saida = site(warehouse, tmp_path)
+    estados = texto(saida, "estados.html")
+    assert estados.count('href="estado/') == 27 and "Nordeste" in estados and "busca-estado" not in estados
+    inicio = texto(saida, "index.html")
+    assert 'href="estados.html"' in inicio and inicio.count('href="estado/') == 0
+    assert ">Estados</a>" in inicio[inicio.index('<nav class="nav"') : inicio.index("</nav>")]

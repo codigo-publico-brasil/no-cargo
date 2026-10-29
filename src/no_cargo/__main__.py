@@ -64,12 +64,19 @@ def construir(con: dados.Connection, saida: Path, hoje: date | None = None, foto
     saida.mkdir(parents=True, exist_ok=True)
     shutil.copytree(ESTATICOS, saida, dirs_exist_ok=True)  # css, js, símbolo e fontes (arquivos binários)
     trazer_fotos([*eleitos, *atuais], fotos, saida)
-    escritas: list[str] = ["index.html", "pessoas.html", "cargos.html", "como-calculamos.html"]
+    escritas: list[str] = [
+        "index.html",
+        "pessoas.html",
+        "estados.html",
+        "cargos.html",
+        "como-calculamos.html",
+    ]
     escrever(saida / "index.html", paginas.brasil(ano, eleitos, situacao, capturado))
     escrever(saida / "pessoas.html", paginas.pessoas(ano, eleitos, capturado, atuais))
+    escrever(saida / "estados.html", paginas.estados(capturado))
     escrever(saida / "cargos.html", textos.cargos())
     escrever(saida / "como-calculamos.html", textos.como_calculamos())
-    total = 4
+    total = 5
     for uf in paginas.UFS:
         escrever(saida / "estado" / f"{uf}.html", paginas.estado(uf, ano, eleitos, situacao, capturado))
         escritas.append(f"estado/{uf}.html")

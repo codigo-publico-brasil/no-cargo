@@ -47,6 +47,7 @@ PODERES = (
 NAV = (
     ("inicio", "Início", "index.html"),
     ("pessoas", "Pessoas", "pessoas.html"),
+    ("estados", "Estados", "estados.html"),
     ("cargos", "Cargos", "cargos.html"),
     ("como", "Origens", "como-calculamos.html"),
 )
@@ -255,7 +256,7 @@ def brasil(ano: int, eleitos: list[Row], situacao: list[Row], capturado: date | 
             aviso_provisorio(capturado),
         ),
         indice_dos_poderes(),
-        seletor_de_estado(),
+        atalhos_da_home(),
         '<div class="secao">',
         banda(*PODERES[0]),
         esfera("Federal", "Todo o Brasil"),
@@ -388,11 +389,21 @@ def pessoas(
     )
 
 
-def seletor_de_estado() -> str:
+def atalhos_da_home() -> str:
+    """Duas portas curtas no alto da home: o resto da página fica para o cenário geral."""
+    return (
+        '<div class="atalhos">'
+        '<a class="card" href="estados.html"><b>Ver um estado</b><span>Os 27 estados e o Distrito Federal</span></a>'
+        '<a class="card" href="pessoas.html"><b>Buscar uma pessoa</b><span>Todas as pessoas eleitas e em mandato</span></a>'
+        "</div>"
+    )
+
+
+def estados(capturado: date | None) -> str:
     """Os 27 estados em grade, por região: cada um é um link; sem busca nem filtro."""
     regioes = ["Norte", "Nordeste", "Centro-Oeste", "Sudeste", "Sul"]
     blocos = "".join(
-        f'<h3>{regiao}</h3><ul class="estados">'
+        f'<h2 class="regiao">{regiao}</h2><ul class="estados">'
         + "".join(
             f'<li><a href="estado/{uf}.html"><b>{uf}</b><span>{e(nome)}</span></a></li>'
             for uf, (nome, reg) in sorted(UFS.items(), key=lambda kv: kv[1][0])
@@ -401,10 +412,21 @@ def seletor_de_estado() -> str:
         + "</ul>"
         for regiao in regioes
     )
-    return (
-        '<section class="secao seletor" id="estados"><h2>Escolha um estado</h2>'
-        f"{blocos}"
-        '<p class="nota">Procura uma pessoa? <a href="pessoas.html">Veja todas as pessoas eleitas</a>.</p></section>'
+    corpo = [
+        faixa_de_titulo(
+            "Estados · todo o Brasil",
+            "Escolha um estado",
+            "Quem foi eleito em cada estado e no Distrito Federal, pelos três poderes.",
+            aviso_provisorio(capturado),
+        ),
+        f'<div class="secao">{blocos}</div>',
+    ]
+    return pagina(
+        "Estados",
+        "\n".join(corpo),
+        "estados",
+        descricao="Os 27 estados e o Distrito Federal: escolha um para ver quem foi eleito.",
+        caminho="estados.html",
     )
 
 
