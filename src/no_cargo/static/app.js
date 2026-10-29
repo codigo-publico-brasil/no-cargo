@@ -23,7 +23,7 @@
         return x < y ? -1 : x > y ? 1 : 0;
       });
       itens.forEach(function (i) {
-        var ok = (!estado.tipo || i.dataset.tipo === estado.tipo) && (!estado.cargo || i.dataset.cargo === estado.cargo) && (!estado.grupo || i.dataset.grupo === estado.grupo) &&
+        var ok = (!estado.tipo || i.dataset.tipo === estado.tipo) && (!estado.cargo || i.dataset.cargo === estado.cargo) && (!estado.grupo || (" " + i.dataset.grupo + " ").indexOf(" " + estado.grupo + " ") >= 0) &&
           (!termo || norm(i.dataset.nome).indexOf(termo) >= 0 || norm(i.dataset.partido).indexOf(termo) >= 0 ||
             (i.dataset.local && norm(i.dataset.local).indexOf(termo) >= 0));
         i.hidden = !ok;
@@ -42,12 +42,10 @@
         aplicar();
       });
     });
-    var porTipo = lista.querySelector("#filtro-tipo");
-    if (porTipo) { porTipo.addEventListener("change", function () { estado.tipo = porTipo.value; aplicar(); }); }
-    var porCargo = lista.querySelector("#filtro-cargo");
-    if (porCargo) { porCargo.addEventListener("change", function () { estado.cargo = porCargo.value; aplicar(); }); }
-    var porOrdem = lista.querySelector("#filtro-ordem");
-    if (porOrdem) { porOrdem.addEventListener("change", function () { estado.ordem = porOrdem.value; aplicar(); }); }
+    [["tipo", "tipo"], ["cargo", "cargo"], ["grupo", "grupo"], ["ordem", "ordem"]].forEach(function (par) {
+      var campo = lista.querySelector('[data-filtro="' + par[0] + '"]');
+      if (campo) { campo.addEventListener("change", function () { estado[par[1]] = campo.value; aplicar(); }); }
+    });
     aplicar();
   });
 

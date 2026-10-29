@@ -1,7 +1,8 @@
 """Consultas ao warehouse. Lêem só o esquema `marts` da plataforma de dados, em modo somente leitura.
 
 A aplicação não importa nada da camada de dados: o contrato entre as duas é o esquema `marts` (colunas e tipos
-garantidos pelo contrato do dbt). Nada é calculado ou estimado aqui além de somas e contagens do que a fonte diz.
+garantidos pelo contrato do dbt). Nada é calculado ou estimado aqui além de somas e contagens do que a fonte diz:
+quem ocupa cada cargo, e de quando a quando, vem de `app_cargo_ocupantes`.
 """
 
 from datetime import date
@@ -26,104 +27,153 @@ def rows(con: Connection, sql: str, args: tuple[object, ...] = ()) -> list[Row]:
 
 def ultimo_ano(con: Connection) -> int:
     """O ano da eleição geral mais recente com eleitos."""
+    marcadores = ", ".join("?" for _ in CARGOS)
     found = con.execute(
-        "SELECT max(ano_eleicao) FROM marts.eleitos WHERE cargo IN ('Presidente', 'Governador', 'Senador', 'Deputado federal')"
+        f"SELECT max(ano_eleicao) FROM marts.app_pessoa_campanhas WHERE fl_eleito AND cargo IN ({marcadores})",
+        CARGOS,
     ).fetchone()
     if not found or found[0] is None:
-        raise SystemExit("marts.eleitos está vazio: rode a plataforma de dados antes.")
+        raise SystemExit("marts.app_pessoa_campanhas está vazio: rode a plataforma de dados antes.")
     return int(found[0])
 
 
-def _eleitos(con: Connection, onde: str, args: tuple[object, ...]) -> list[Row]:
+_SELECT = """
+SELECT b.id_candidatura, CAST(split_part(b.id_candidatura, ':', 1) AS INTEGER) AS ano_eleicao,
+       split_part(b.id_candidatura, ':', 2) AS uf, r.turno, b.cargo, c.nome_urna, b.nome, b.partido,
+       r.qtd_votos_nominais AS qtd_votos, r.percentual_votos_validos, b.id_pessoa, b.tipo_mandato,
+       b.ano_inicio, b.dt_inicio, b.dt_fim_prevista, b.fonte_url, b.dt_captura,
+       k.valor_bens, k.valor_receitas, k.valor_despesas, k.fonte_url_bens, k.fonte_url_receitas,
+       k.fonte_url_despesas, k.dt_captura_campanha,
+       p.foto_url, p.nome_civil, p.dt_nascimento, p.municipio_nascimento, p.uf_nascimento, p.profissoes,
+       p.site_url, p.rede_social_url, p.fontes AS fonte_cadastro, p.fonte_url AS fonte_cadastro_url,
+       p.dt_captura AS dt_captura_cadastro, c.ocupacao, c.foto_caminho
+FROM marts.app_cargo_ocupantes b
+JOIN marts.fct_candidaturas c ON c.id_candidatura = b.id_candidatura
+LEFT JOIN (
+    SELECT id_candidatura, turno, qtd_votos_nominais, percentual_votos_validos FROM marts.fct_resultados
+    QUALIFY row_number() OVER (PARTITION BY id_candidatura ORDER BY turno DESC) = 1
+) r ON r.id_candidatura = b.id_candidatura
+LEFT JOIN marts.app_pessoa_campanhas k ON k.id_candidatura = b.id_candidatura
+LEFT JOIN marts.app_pessoas p ON p.id_pessoa = b.id_pessoa
+"""
+
+
+def _ocupantes(con: Connection, onde: str, args: tuple[object, ...]) -> list[Row]:
+    marcadores = ", ".join("?" for _ in CARGOS)
     return rows(
         con,
-        "SELECT e.id_candidatura, e.ano_eleicao, e.turno, e.uf, e.cargo, e.nome_urna, e.nome, e.partido, e.qtd_votos, "
-        "e.percentual_votos_nominais, e.id_pessoa, e.tipo_mandato, e.dt_captura, e.fonte_url, "
-        "k.valor_bens, k.valor_receitas, k.valor_despesas, k.fonte_url_bens, k.fonte_url_contas, "
-        "p.foto_url, p.nome_civil, p.dt_nascimento, p.municipio_nascimento, "
-        "p.uf_nascimento, p.profissoes, p.site_url, p.rede_social_url, p.fonte AS fonte_cadastro, "
-        "p.dt_captura AS dt_captura_cadastro, e.id_pessoa_tse, e.ocupacao, e.uf_nascimento AS uf_nascimento_tse "
-        "FROM marts.eleitos e "
-        "LEFT JOIN marts.eleitos_campanhas k USING (id_candidatura) "
-        "LEFT JOIN marts.pessoas p ON p.id_pessoa = e.id_pessoa "
-        f"WHERE {onde} "
-        "ORDER BY e.uf, e.cargo, e.nome_urna, e.id_candidatura",
-        args,
+        _SELECT + f" WHERE b.cargo IN ({marcadores}) AND {onde} "
+        "ORDER BY uf, b.cargo, c.nome_urna, b.id_candidatura",
+        (*CARGOS, *args),
     )
 
 
 def eleitos(con: Connection, ano: int) -> list[Row]:
     """Eleitos das eleições gerais do ano, com o total da campanha e a foto. Ordem alfabética."""
-    marcadores = ", ".join("?" for _ in CARGOS)
-    return _eleitos(con, f"e.ano_eleicao = ? AND e.cargo IN ({marcadores})", (ano, *CARGOS))
+    return _ocupantes(con, "b.ano_inicio = ?", (ano + 1,))
 
 
-def em_exercicio(con: Connection, ano: int, hoje: date, eleitos_do_ano: list[Row]) -> list[Row]:
-    """Quem foi eleito antes de `ano` e ainda está no mandato previsto (4 anos; 8 para senador), e não está entre os
-    eleitos do ano. O período vem da lei aplicada ao resultado do TSE: o resultado não registra afastamentos nem
-    suplentes que assumiram. Cada linha leva `em_exercicio = True`."""
+def ocupantes(con: Connection, em: date) -> list[Row]:
+    """Quem ocupa cada cargo das eleições gerais na data `em`, segundo a base (início e fim do mandato)."""
+    return _ocupantes(con, "b.dt_inicio <= ? AND b.dt_fim_prevista >= ?", (em, em))
+
+
+def data_da_posse(con: Connection, hoje: date) -> date | None:
+    """O dia em que a composição que vem das urnas está completa: a última das primeiras posses depois de `hoje`."""
     marcadores = ", ".join("?" for _ in CARGOS)
-    candidatos = _eleitos(
+    linha = rows(
         con,
-        f"e.ano_eleicao < ? AND e.cargo IN ({marcadores}) AND e.ano_eleicao + 1 <= ? "
-        "AND ? <= e.ano_eleicao + CASE WHEN e.cargo = 'Senador' THEN 8 ELSE 4 END",
-        (ano, *CARGOS, hoje.year, hoje.year),
+        "SELECT max(inicio) AS posse FROM (SELECT cargo, min(dt_inicio) AS inicio FROM marts.app_cargo_ocupantes "
+        f"WHERE dt_inicio > ? AND cargo IN ({marcadores}) GROUP BY cargo)",
+        (hoje, *CARGOS),
     )
-    do_ano_tse = {r["id_pessoa_tse"] for r in eleitos_do_ano if r["id_pessoa_tse"]}
-    do_ano = {r["id_pessoa"] for r in eleitos_do_ano if r["id_pessoa"]}
-    return [
-        {**r, "em_exercicio": True}
-        for r in candidatos
-        if r["id_pessoa_tse"] not in do_ano_tse and r["id_pessoa"] not in do_ano
+    return linha[0]["posse"] if linha else None
+
+
+def na_posse(con: Connection, hoje: date, eleitos_do_ano: list[Row]) -> list[Row]:
+    """A composição depois da posse: quem ocupa os cargos no dia em que a composição das urnas está completa, mais
+    os eleitos do ano que a base ainda não data (hoje, os deputados estaduais e distritais)."""
+    posse = data_da_posse(con, hoje)
+    if posse is None:
+        return []
+    sem_data = [r for r in eleitos_do_ano if r["dt_inicio"] is None]
+    renovadas = {(r["cargo"], r["uf"]) for r in sem_data}  # a casa inteira é renovada: o mandato antigo acaba
+    ano = max((r["ano_eleicao"] for r in eleitos_do_ano), default=0)
+    linhas = [
+        r for r in ocupantes(con, posse) if (r["cargo"], r["uf"]) not in renovadas or r["ano_eleicao"] == ano
     ]
+    vistos = {r["id_candidatura"] for r in linhas}
+    return [*linhas, *(r for r in sem_data if r["id_candidatura"] not in vistos)]
+
+
+def em_exercicio(con: Connection, hoje: date, eleitos_do_ano: list[Row]) -> list[Row]:
+    """Quem ocupa o cargo hoje e não está entre os eleitos do ano (os reeleitos têm ficha pela eleição nova).
+    Cada linha leva `em_exercicio = True`."""
+    do_ano = {r["id_pessoa"] for r in eleitos_do_ano if r["id_pessoa"]}
+    return [{**r, "em_exercicio": True} for r in ocupantes(con, hoje) if r["id_pessoa"] not in do_ano]
+
+
+def ids_em_mandato(con: Connection, hoje: date) -> set[int]:
+    """As pessoas que ocupam hoje um cargo das eleições gerais, inclusive quem foi reeleito."""
+    marcadores = ", ".join("?" for _ in CARGOS)
+    linhas = rows(
+        con,
+        "SELECT DISTINCT id_pessoa FROM marts.app_cargo_ocupantes "
+        f"WHERE dt_inicio <= ? AND dt_fim_prevista >= ? AND cargo IN ({marcadores})",
+        (hoje, hoje, *CARGOS),
+    )
+    return {r["id_pessoa"] for r in linhas}
 
 
 def situacao_dos_cargos(con: Connection, ano: int) -> list[Row]:
     """Vagas, eleitos e pendentes de cada cargo em cada unidade eleitoral (só os cargos das eleições gerais)."""
     marcadores = ", ".join("?" for _ in CARGOS)
-    return rows(
+    linhas = rows(
         con,
-        "SELECT uf, cargo, qtd_vagas, qtd_eleitos, qtd_pendentes, status, dt_captura "
-        f"FROM marts.eleitos_cargos WHERE ano_eleicao = ? AND cargo IN ({marcadores}) ORDER BY uf, cargo",
+        "SELECT d.ue AS uf, g.nome AS cargo, d.qtd_vagas, "
+        "count(o.id_candidatura) AS qtd_eleitos, max(o.dt_captura) AS dt_captura "
+        "FROM marts.dim_disputas d "
+        "JOIN marts.dim_eleicoes e ON e.id_eleicao = d.id_eleicao "
+        "JOIN marts.dim_cargos g ON g.id_cargo = d.id_cargo "
+        "LEFT JOIN marts.app_cargo_ocupantes o ON o.cargo = g.nome "
+        "  AND split_part(o.id_candidatura, ':', 1) = CAST(e.ano_eleicao AS VARCHAR) "
+        "  AND split_part(o.id_candidatura, ':', 2) = d.ue "
+        f"WHERE e.ano_eleicao = ? AND g.nome IN ({marcadores}) "
+        "GROUP BY d.ue, g.nome, d.qtd_vagas ORDER BY d.ue, g.nome",
         (ano, *CARGOS),
     )
+    for r in linhas:
+        r["qtd_pendentes"] = max(int(r["qtd_vagas"]) - int(r["qtd_eleitos"]), 0)
+    return linhas
 
 
-def candidaturas(con: Connection, id_pessoa: int) -> list[Row]:
-    """Candidaturas da pessoa em todas as eleições carregadas, da mais recente para a mais antiga (uma por cargo e eleição, pelo último turno)."""
-    return rows(
+def candidaturas_das_pessoas(con: Connection, ids: list[int]) -> dict[int, list[Row]]:
+    """Candidaturas de cada pessoa em todas as eleições carregadas, da mais recente para a mais antiga."""
+    linhas = rows(
         con,
-        "SELECT ano_eleicao, turno, uf, cargo, partido, resultado, dt_captura FROM marts.candidaturas "
-        "WHERE id_pessoa = ? "
-        "QUALIFY row_number() OVER (PARTITION BY ano_eleicao, cargo ORDER BY turno DESC) = 1 "  # um por eleição: vale o último turno
-        "ORDER BY ano_eleicao DESC",
-        (id_pessoa,),
+        "SELECT id_pessoa, ano_eleicao, cargo, partido, resultado, fl_eleito FROM marts.app_pessoa_campanhas "
+        "WHERE list_contains(?, id_pessoa) ORDER BY ano_eleicao DESC",
+        (ids,),
     )
+    por_pessoa: dict[int, list[Row]] = {}
+    for r in linhas:
+        por_pessoa.setdefault(r["id_pessoa"], []).append(r)
+    return por_pessoa
 
 
-def historico(con: Connection, id_candidatura: str) -> list[Row]:
-    """Candidaturas anteriores do eleito achadas nas eleições do TSE (mesmo nome civil e nascimento, únicos)."""
-    return rows(
+def ocupacoes_das_pessoas(con: Connection, ids: list[int]) -> dict[int, list[Row]]:
+    """Todos os mandatos de cada pessoa na base (qualquer cargo), do mais recente para o mais antigo."""
+    linhas = rows(
         con,
-        "SELECT ano_eleicao, turno, uf, cargo, partido, resultado, dt_captura FROM marts.eleitos_historico "
-        "WHERE id_candidatura = ? ORDER BY ano_eleicao DESC",
-        (id_candidatura,),
+        "SELECT id_pessoa, id_candidatura, cargo, territorio, partido, ano_inicio, dt_inicio, dt_fim_prevista, "
+        "base_do_inicio, tipo_mandato "
+        "FROM marts.app_cargo_ocupantes WHERE list_contains(?, id_pessoa) ORDER BY ano_inicio DESC, dt_inicio DESC",
+        (ids,),
     )
-
-
-def mandatos(con: Connection, id_pessoa: int) -> list[Row]:
-    """Mandatos da pessoa na Câmara e no Senado, do mais recente para o mais antigo.
-
-    A plataforma registra o mandato por legislatura (as datas de início e fim do próprio mandato vêm vazias),
-    então o período mostrado é o da legislatura em que a pessoa tem voto registrado.
-    """
-    return rows(
-        con,
-        "SELECT DISTINCT casa, cargo, uf, coalesce(dt_inicio, dt_legislatura_inicio) AS dt_inicio, "
-        "coalesce(dt_fim, dt_legislatura_fim) AS dt_fim FROM marts.mandatos "
-        "WHERE id_pessoa = ? ORDER BY dt_inicio DESC",
-        (id_pessoa,),
-    )
+    por_pessoa: dict[int, list[Row]] = {}
+    for r in linhas:
+        por_pessoa.setdefault(r["id_pessoa"], []).append(r)
+    return por_pessoa
 
 
 def ininterrupto_desde(mandatos_da_pessoa: list[Row], hoje: date) -> date | None:
