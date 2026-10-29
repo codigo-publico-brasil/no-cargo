@@ -616,3 +616,13 @@ def test_the_timeline_of_someone_elected_in_2026_shows_the_next_mandate_on_top_o
         pagina.index("Próximo mandato") < pagina.index("Mandato atual") < pagina.index("Candidatura em 2018")
     )
     assert "2027 a 2030 &middot; eleito em 2026 &middot; Deputado federal &middot; Partido A" in pagina
+
+
+def test_the_in_office_filter_includes_whoever_was_reelected(warehouse, tmp_path):
+    pagina = texto(site(warehouse, tmp_path), "pessoas.html")
+    ana = pagina[pagina.index('href="pessoa/ana-exemplo-2026-rj-1.html"') :].split(">", 1)[0]
+    assert 'data-grupo="novo atual"' in ana  # eleita em 2026 e ainda no mandato de 2022
+    gil = pagina[pagina.index('href="pessoa/gil-anterior-2022-rj-201.html"') :].split(">", 1)[0]
+    assert 'data-grupo="atual"' in gil
+    bruno = pagina[pagina.index('href="pessoa/bruno-modelo-2026-rj-2.html"') :].split(">", 1)[0]
+    assert 'data-grupo="novo"' in bruno  # o mandato dele terminou em 2022

@@ -76,7 +76,10 @@ def construir(
         "como-calculamos.html",
     ]
     escrever(saida / "index.html", paginas.brasil(ano, eleitos, situacao, capturado, agora))
-    escrever(saida / "pessoas.html", paginas.pessoas(ano, eleitos, capturado, atuais))
+    escrever(
+        saida / "pessoas.html",
+        paginas.pessoas(ano, eleitos, capturado, atuais, dados.ids_em_mandato(con, hoje)),
+    )
     escrever(saida / "estados.html", paginas.estados(capturado))
     escrever(saida / "cargos.html", textos.cargos())
     escrever(saida / "como-calculamos.html", textos.como_calculamos())

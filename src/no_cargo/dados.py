@@ -118,6 +118,18 @@ def em_exercicio(con: Connection, hoje: date, eleitos_do_ano: list[Row]) -> list
     return [{**r, "em_exercicio": True} for r in ocupantes(con, hoje) if r["id_pessoa"] not in do_ano]
 
 
+def ids_em_mandato(con: Connection, hoje: date) -> set[int]:
+    """As pessoas que ocupam hoje um cargo das eleições gerais, inclusive quem foi reeleito."""
+    marcadores = ", ".join("?" for _ in CARGOS)
+    linhas = rows(
+        con,
+        "SELECT DISTINCT id_pessoa FROM marts.app_cargo_ocupantes "
+        f"WHERE dt_inicio <= ? AND dt_fim_prevista >= ? AND cargo IN ({marcadores})",
+        (hoje, hoje, *CARGOS),
+    )
+    return {r["id_pessoa"] for r in linhas}
+
+
 def situacao_dos_cargos(con: Connection, ano: int) -> list[Row]:
     """Vagas, eleitos e pendentes de cada cargo em cada unidade eleitoral (só os cargos das eleições gerais)."""
     marcadores = ", ".join("?" for _ in CARGOS)

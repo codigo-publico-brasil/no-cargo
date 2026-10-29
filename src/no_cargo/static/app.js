@@ -23,7 +23,7 @@
         return x < y ? -1 : x > y ? 1 : 0;
       });
       itens.forEach(function (i) {
-        var ok = (!estado.tipo || i.dataset.tipo === estado.tipo) && (!estado.cargo || i.dataset.cargo === estado.cargo) && (!estado.grupo || i.dataset.grupo === estado.grupo) &&
+        var ok = (!estado.tipo || i.dataset.tipo === estado.tipo) && (!estado.cargo || i.dataset.cargo === estado.cargo) && (!estado.grupo || (" " + i.dataset.grupo + " ").indexOf(" " + estado.grupo + " ") >= 0) &&
           (!termo || norm(i.dataset.nome).indexOf(termo) >= 0 || norm(i.dataset.partido).indexOf(termo) >= 0 ||
             (i.dataset.local && norm(i.dataset.local).indexOf(termo) >= 0));
         i.hidden = !ok;

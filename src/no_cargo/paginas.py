@@ -321,11 +321,11 @@ def nome_do_local(uf: str) -> str:
     return "Brasil" if uf == "BR" else UFS.get(uf, (uf,))[0]
 
 
-def linha_de_pessoa(r: Row) -> str:
+def linha_de_pessoa(r: Row, em_mandato: bool = False) -> str:
     nome_uf = nome_do_local(r["uf"])
     return (
         f'<a class="pessoa linha" href="pessoa/{arquivo_da_ficha(r["nome_urna"], r["id_candidatura"])}" data-nome="{e(sem_acento(str(r["nome_urna"])))}" '
-        f'data-partido="{e(sem_acento(str(r["partido"])))}" data-cargo="{e(r["cargo"])}" data-uf="{e(r["uf"])}" data-grupo="{"atual" if r.get("em_exercicio") else "novo"}" '
+        f'data-partido="{e(sem_acento(str(r["partido"])))}" data-cargo="{e(r["cargo"])}" data-uf="{e(r["uf"])}" data-grupo="{"atual" if r.get("em_exercicio") else "novo atual" if em_mandato else "novo"}" '
         f'data-local="{e(sem_acento(f"{r['cargo']} {r['uf']} {nome_uf}"))}"><span class="dados"><b>{e(r["nome_urna"])}</b>'
         f"<span>{e(r['cargo'])} &middot; {e(r['uf'] if r['uf'] != 'BR' else 'Brasil')} &middot; {e(r['partido'])} &middot; eleito em {r['ano_eleicao']}</span></span>"
         '<i aria-hidden="true">&#8250;</i></a>'
@@ -333,7 +333,11 @@ def linha_de_pessoa(r: Row) -> str:
 
 
 def pessoas(
-    ano: int, eleitos: list[Row], capturado: date | None, em_exercicio: list[Row] | None = None
+    ano: int,
+    eleitos: list[Row],
+    capturado: date | None,
+    em_exercicio: list[Row] | None = None,
+    em_mandato: set[int] | None = None,
 ) -> str:
     """Os eleitos do ano e quem ainda está no mandato de uma eleição anterior, de qualquer cargo e estado, em ordem alfabética; o JS só filtra e ordena."""
     todos = sorted(
@@ -364,7 +368,7 @@ def pessoas(
             aviso_provisorio(capturado),
         ),
         f'<div class="secao"><div class="lista" data-filtravel>{controles}<div class="itens lista-linhas">'
-        + "".join(linha_de_pessoa(r) for r in todos)
+        + "".join(linha_de_pessoa(r, r["id_pessoa"] in (em_mandato or set())) for r in todos)
         + "</div></div></div>",
     ]
     return pagina(
