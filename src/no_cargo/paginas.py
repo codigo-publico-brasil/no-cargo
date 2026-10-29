@@ -811,6 +811,18 @@ def sobre_a_pessoa(r: Row) -> str:
     return grade(linhas, largos=("Nome completo",), numeros=("Nascimento",)) + f'<p class="nota">{fonte}</p>'
 
 
+def _sobrepoe(a: Row, b: Row) -> bool:
+    """Dois mandatos do mesmo cargo que se cruzam no tempo (sem data, não se cruzam)."""
+    if a["cargo"] != b["cargo"] or None in (
+        a["dt_inicio"],
+        a["dt_fim_prevista"],
+        b["dt_inicio"],
+        b["dt_fim_prevista"],
+    ):
+        return False
+    return bool(a["dt_inicio"] <= b["dt_fim_prevista"] and b["dt_inicio"] <= a["dt_fim_prevista"])
+
+
 def _eleito(c: Row) -> bool:
     return bool(c.get("fl_eleito")) or str(c["resultado"] or "").lower().startswith("eleito")
 
@@ -825,6 +837,10 @@ def ficha(
     cargo = r["cargo"]
     caminho = "pessoa/" + arquivo_da_ficha(r["nome_urna"], r["id_candidatura"])
     atual = bool(r.get("em_exercicio"))  # eleito antes e ainda no mandato, fora da lista dos eleitos do ano
+    com_eleicao = [o for o in ocupacoes if o["id_candidatura"]]
+    ocupacoes = [  # o exercício informado pela Câmara ou pelo Senado não repete o mandato que a eleição já deu
+        o for o in ocupacoes if o["id_candidatura"] or not any(_sobrepoe(o, x) for x in com_eleicao)
+    ]
     itens: list[tuple[str, str, str, str, str]] = []
     mandatos_passados: list[tuple[int, tuple[str, str, str, str, str]]] = []
     for o in ocupacoes:  # do mais recente para o mais antigo; as datas vêm do banco
@@ -835,14 +851,15 @@ def ficha(
             tipo = (
                 "proximo" if o["dt_inicio"] > hoje else "atual" if o["dt_fim_prevista"] >= hoje else "mandato"
             )
-        eleito_em = str(o["id_candidatura"]).split(":", 1)[0]
+        eleito_em = str(o["id_candidatura"]).split(":", 1)[0] if o["id_candidatura"] else None
         periodo = (
             f"a partir de {o['ano_inicio']}" if sem_data else periodo_de(o["dt_inicio"], o["dt_fim_prevista"])
         )
         titulo = {"proximo": "Próximo mandato", "atual": "Mandato atual"}.get(tipo, f"Mandato de {periodo}")
         linha = (
             (f"{periodo} &middot; " if tipo != "mandato" else "")
-            + f"eleito em {eleito_em} &middot; {e(o['cargo'])}"
+            + (f"eleito em {eleito_em} &middot; " if eleito_em else "")
+            + e(o["cargo"])
             + (f" &middot; {e(o['partido'])}" if o["partido"] else "")
         )
         item = (
@@ -855,10 +872,12 @@ def ficha(
             else barra_de_mandato(o["dt_inicio"], o["dt_fim_prevista"], hoje),
         )
         if tipo == "mandato":
-            mandatos_passados.append((int(eleito_em), item))
+            mandatos_passados.append((int(eleito_em or o["ano_inicio"]), item))
         else:
             itens.append(item)
-    ocupadas = {(int(str(o["id_candidatura"]).split(":", 1)[0]), o["cargo"]) for o in ocupacoes}
+    ocupadas = {
+        (int(str(o["id_candidatura"]).split(":", 1)[0]), o["cargo"]) for o in ocupacoes if o["id_candidatura"]
+    }
     passado = [
         (
             c["ano_eleicao"],
