@@ -407,8 +407,8 @@ def atalhos_da_home() -> str:
     """Duas portas curtas no alto da home: o resto da página fica para o cenário geral."""
     return (
         '<div class="atalhos">'
-        '<a class="card" href="estados.html"><b>Ver um estado</b><span>Os 27 estados e o Distrito Federal</span></a>'
-        '<a class="card" href="pessoas.html"><b>Buscar uma pessoa</b><span>Todas as pessoas eleitas e em mandato</span></a>'
+        '<a class="card" href="estados.html"><b>Estados</b><span>27 estados e DF</span></a>'
+        '<a class="card" href="pessoas.html"><b>Pessoas</b><span>Busca por nome</span></a>'
         "</div>"
     )
 

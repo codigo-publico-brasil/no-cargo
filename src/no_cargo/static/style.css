@@ -184,3 +184,6 @@ main{max-width:var(--larg);margin:0 auto;padding:0 var(--gut)}
 .tempo .barra>div{display:flex;justify-content:space-between;gap:12px;margin-top:4px;font-size:14px;color:var(--muted)}
 .tempo li>div>span{margin-top:2px}
 .card>.tempo:first-child{margin-top:0;padding-top:4px;border-top:0}
+.atalhos a{white-space:nowrap;min-height:60px}
+.indice+.secao{padding-top:0}
+.secao>.poder:first-child{margin-top:16px}
