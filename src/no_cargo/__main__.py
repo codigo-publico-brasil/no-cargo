@@ -12,7 +12,7 @@ import argparse
 import os
 import shutil
 from collections import Counter
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import duckdb
@@ -53,9 +53,16 @@ def trazer_fotos(pessoas: list[dados.Row], origem: Path | None, saida: Path) -> 
     return trazidas
 
 
-def construir(con: dados.Connection, saida: Path, hoje: date | None = None, fotos: Path | None = None) -> int:
+def construir(
+    con: dados.Connection,
+    saida: Path,
+    hoje: date | None = None,
+    fotos: Path | None = None,
+    agora: datetime | None = None,
+) -> int:
     """Escreve o site em `saida` e devolve quantas páginas gerou."""
-    hoje = hoje or date.today()
+    agora = agora or datetime.now(timezone(timedelta(hours=-3)))  # horário de Brasília, sem horário de verão
+    hoje = hoje or agora.date()
     ano = dados.ultimo_ano(con)
     eleitos = dados.eleitos(con, ano)
     atuais = dados.em_exercicio(con, ano, hoje, eleitos)
@@ -71,7 +78,7 @@ def construir(con: dados.Connection, saida: Path, hoje: date | None = None, foto
         "cargos.html",
         "como-calculamos.html",
     ]
-    escrever(saida / "index.html", paginas.brasil(ano, eleitos, situacao, capturado))
+    escrever(saida / "index.html", paginas.brasil(ano, eleitos, situacao, capturado, agora))
     escrever(saida / "pessoas.html", paginas.pessoas(ano, eleitos, capturado, atuais))
     escrever(saida / "estados.html", paginas.estados(capturado))
     escrever(saida / "cargos.html", textos.cargos())

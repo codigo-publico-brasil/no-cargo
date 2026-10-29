@@ -158,18 +158,32 @@ main{max-width:var(--larg);margin:0 auto;padding:0 var(--gut)}
 .estados b{font-family:var(--mono);font-size:15px;letter-spacing:.06em}.estados span{font-size:15px;color:var(--muted)}
 @media (min-width:600px){.estados{grid-template-columns:repeat(3,1fr)}}
 @media (min-width:760px){.estados{grid-template-columns:repeat(4,1fr)}}
-.mandatos{display:flex;flex-direction:column;gap:20px}
-.mandato .titulo{display:flex;justify-content:space-between;align-items:baseline;gap:12px}.mandato .titulo b{font-size:18px}.mandato .titulo span{font-family:var(--mono);font-size:14px;color:var(--muted)}
-.mandato progress{display:block;width:100%;height:14px;margin:8px 0 6px;border:0;border-radius:999px;overflow:hidden;appearance:none;background:var(--line)}
-.mandato progress::-webkit-progress-bar{background:var(--line)}
-.mandato progress::-webkit-progress-value{background:var(--green-ink);border-radius:999px}
-.mandato progress::-moz-progress-bar{background:var(--green-ink);border-radius:999px}
-.mandato.futuro progress{outline:1px dashed var(--borda);outline-offset:-1px;background:transparent}.mandato.futuro progress::-webkit-progress-bar{background:transparent}
-.mandato .legenda-barra{display:flex;justify-content:space-between;gap:12px;font-size:15px;color:var(--muted)}
-.card .mandatos+.nota,.card .mandatos+.tempo{margin-top:16px}
-.atalhos{display:grid;grid-template-columns:1fr;gap:10px;margin-top:20px}
-.atalhos a{display:flex;flex-direction:column;gap:2px;color:var(--ink);text-decoration:none;min-height:60px;justify-content:center}
-.atalhos a:hover{border-color:var(--green-ink)}.atalhos b{font-size:18px}.atalhos span{color:var(--muted);font-size:15px}
 @media (min-width:600px){.atalhos{grid-template-columns:1fr 1fr}}
 .busca-estado input{width:100%;min-height:52px;padding:0 16px;font:inherit;font-size:18px;border:1px solid var(--borda);border-radius:12px;background:var(--surface);color:var(--ink)}
 .busca-estado[hidden],.estados li[hidden],.estados[hidden],.regiao[hidden]{display:none}
+.grade dd small{white-space:normal}
+.card.presidente{color:var(--ink);text-decoration:none}.card.presidente:hover{border-color:var(--green-ink)}
+.card.presidente p{margin:2px 0 0;font-size:16px}.card.presidente>div{flex:1;min-width:0}
+.card.presidente i{font-size:24px;color:var(--green-ink);font-style:normal}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 0}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-size:14px;line-height:1.3;color:var(--muted)}
+.chip::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--green-ink)}
+.atalhos{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.atalhos a{display:flex;flex-direction:column;gap:2px;justify-content:center;min-height:64px;padding:10px 14px;color:var(--ink);text-decoration:none}
+.atalhos a:hover{border-color:var(--green-ink)}.atalhos b{font-size:17px}.atalhos span{color:var(--muted);font-size:14px;line-height:1.3}
+.indice{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px;padding:0}
+.indice a{justify-content:center;min-height:44px;padding:0 8px;border:1px solid var(--line);border-radius:999px;background:var(--surface);border-bottom:1px solid var(--line);text-align:center}
+.indice a:hover{border-color:var(--green-ink)}
+.tempo .barra{margin-top:8px}
+.tempo progress{display:block;width:100%;height:12px;border:0;border-radius:999px;overflow:hidden;appearance:none;background:var(--line)}
+.tempo progress::-webkit-progress-bar{background:var(--line)}
+.tempo progress::-webkit-progress-value{background:var(--green-ink);border-radius:999px}
+.tempo progress::-moz-progress-bar{background:var(--green-ink);border-radius:999px}
+.tempo .barra.futuro progress{outline:1px dashed var(--borda);outline-offset:-1px;background:transparent}.tempo .barra.futuro progress::-webkit-progress-bar{background:transparent}
+.tempo .barra>div{display:flex;justify-content:space-between;gap:12px;margin-top:4px;font-size:14px;color:var(--muted)}
+.tempo li>div>span{margin-top:2px}
+.card>.tempo:first-child{margin-top:0;padding-top:4px;border-top:0}
+.atalhos a{white-space:nowrap;min-height:60px}
+.indice+.secao{padding-top:0}
+.secao>.poder:first-child{margin-top:16px}

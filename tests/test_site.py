@@ -1,7 +1,7 @@
 import html
 import json
 import re
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from no_cargo import cores, dados, formato, seo
@@ -287,18 +287,18 @@ def test_a_deputy_elected_senator_is_novato_in_the_senate_and_the_page_says_the_
 
 def test_a_win_for_another_office_appears_as_a_mandate_from_the_election_result(warehouse, tmp_path):
     pagina = texto(site(warehouse, tmp_path), "pessoa/*-2026-rj-1.html")
-    assert "Eleito em 2014" in pagina and "Governador, mandato previsto de 2015 a 2018" in pagina
+    assert "Mandato de 2015 a 2018" in pagina and "Eleito em 2014 &middot; Governador" in pagina
     assert "não registra afastamentos" in pagina
     assert "Eleito em 2022" not in pagina  # deputado federal: o mandato já vem da Câmara
-    assert pagina.index("Eleito em 2014") > pagina.index(
+    assert pagina.index("Mandato de 2015 a 2018") > pagina.index(
         "Candidatura em 2018"
     )  # do mais recente para o mais antigo
 
 
 def test_an_elected_without_a_link_shows_the_earlier_elections_found_in_the_tse(warehouse, tmp_path):
     pagina = texto(site(warehouse, tmp_path), "pessoa/*-2026-rj-2.html")  # Bruno
-    assert "Eleito em 2018" in pagina and "Pelo Partido B." in pagina
-    assert "Deputado federal, mandato previsto de 2019 a 2022" in pagina
+    assert "Mandato de 2019 a 2022" in pagina
+    assert "Eleito em 2018 &middot; Deputado federal &middot; Partido B" in pagina
     assert "Candidatura em 2014" in pagina and "Vereador, suplente" in pagina
     assert "Histórico de mandatos não confirmado" not in pagina  # há prova no TSE
 
@@ -347,13 +347,13 @@ def test_the_person_block_has_the_six_facts_and_short_links(warehouse, tmp_path)
     )
 
 
-def test_the_menu_has_origens_and_a_round_github_button_and_the_home_has_the_powers_index(
-    warehouse, tmp_path
-):
+def test_the_menu_has_no_origens_the_footer_does_and_the_home_has_the_powers_index(warehouse, tmp_path):
     saida = site(warehouse, tmp_path)
     brasil = texto(saida, "index.html")
     topo = brasil[brasil.index('<header class="topo">') : brasil.index("</header>")]
-    assert ">Origens</a>" in topo and "Método" not in topo and 'class="gh"' in topo and REPO in topo
+    nav = topo[topo.index('<nav class="nav"') : topo.index("</nav>")]
+    assert ">Origens<" not in nav and "Método" not in topo and 'class="gh"' in topo and REPO in topo
+    assert ">Origens dos dados</a>" in brasil[brasil.index('<footer class="rodape">') :]
     assert 'href="#poder-executivo"' in brasil and "Poder 1" not in brasil and "poder-num" not in brasil
 
 
@@ -433,7 +433,7 @@ def test_the_site_publishes_robots_sitemap_llms_404_and_the_domain_for_github_pa
 def test_a_person_page_links_to_a_prefilled_correction_issue(warehouse, tmp_path):
     ficha = texto(site(warehouse, tmp_path), "pessoa/*-2026-rj-1.html")
     assert f"{REPO}/issues/new?template=correcao.yml" in ficha and "pagina=https%3A%2F%2F" in ficha
-    assert "Encontrou um erro neste dado?" in ficha
+    assert "Encontrou um erro?" in ficha
 
 
 def test_person_pages_have_the_name_in_the_address(warehouse, tmp_path):
@@ -594,7 +594,7 @@ def test_the_current_mandate_shows_how_much_has_passed_and_the_next_one_starts_e
     pagina = texto(site(warehouse, tmp_path), "pessoa/gil-anterior-2022-rj-201.html")
     # 2023-01-01 a 2026-12-31 e hoje = 25/10/2026: 1.394 de 1.461 dias
     assert '<progress max="100" value="95"' in pagina and "95% cumprido" in pagina
-    assert "Períodos previstos pelo resultado do TSE" in pagina
+    assert "Previsto pelo TSE, que não registra afastamentos" in pagina
     nova = texto(site(warehouse, tmp_path), "pessoa/*-2026-rj-8.html")
     assert '<progress max="100" value="0"' in nova and "começa em" in nova
 
@@ -606,7 +606,7 @@ def test_the_votes_say_what_the_percentage_refers_to_and_the_round(warehouse, tm
 
 def test_the_timeline_shows_the_party_of_each_past_election(warehouse, tmp_path):
     pagina = texto(site(warehouse, tmp_path), "pessoa/*-2026-rj-2.html")  # Bruno
-    assert "Pelo Partido B. Fonte: TSE" in pagina
+    assert "Eleito em 2018 &middot; Deputado federal &middot; Partido B" in pagina
 
 
 def test_the_states_have_their_own_page_and_the_home_only_links_to_it(warehouse, tmp_path):
@@ -624,3 +624,23 @@ def test_the_states_page_has_a_search_box_that_only_shows_with_javascript(wareho
     estados = texto(saida, "estados.html")
     assert 'id="busca-estado"' in estados and 'class="busca-estado" hidden' in estados
     assert 'data-nome="sao paulo sp"' in estados and "busca-estado" in texto(saida, "app.js")
+
+
+def test_the_home_shows_when_the_site_was_updated_and_the_shortcuts_come_before_the_power_buttons(
+    warehouse, tmp_path
+):
+    saida = tmp_path / "dist"
+    construir(warehouse, saida, hoje=date(2026, 10, 29), agora=datetime(2026, 10, 29, 14, 32))
+    inicio = texto(saida, "index.html")
+    assert "Atualizado em 29/10/2026 às 14:32" in inicio and 'class="chip"' in inicio
+    assert inicio.index('class="atalhos"') < inicio.index('class="indice"')
+
+
+def test_the_timeline_of_someone_elected_in_2026_shows_the_next_mandate_on_top_of_the_current_one(
+    warehouse, tmp_path
+):
+    pagina = texto(site(warehouse, tmp_path), "pessoa/*-2026-rj-1.html")  # Ana, reeleita
+    assert (
+        pagina.index("Próximo mandato") < pagina.index("Mandato atual") < pagina.index("Candidatura em 2018")
+    )
+    assert "2027 a 2030 &middot; eleito em 2026 &middot; Partido A" in pagina

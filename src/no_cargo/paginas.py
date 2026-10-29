@@ -3,7 +3,7 @@
 import re
 import unicodedata
 from collections import Counter
-from datetime import date
+from datetime import date, datetime
 
 from no_cargo import seo
 from no_cargo.dados import CARGOS, EXECUTIVO, LEGISLATIVO, Row
@@ -49,7 +49,6 @@ NAV = (
     ("estados", "Estados", "estados.html"),
     ("pessoas", "Pessoas", "pessoas.html"),
     ("cargos", "Cargos", "cargos.html"),
-    ("como", "Origens", "como-calculamos.html"),
 )
 SITE_MAE = "https://codigo-publico-brasil.github.io"
 ICONE_GITHUB = "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
@@ -96,7 +95,7 @@ def pagina(
         '<footer class="rodape"><div><b>No Cargo</b>'
         f'<p>Um projeto do <a href="{SITE_MAE}">Código Público Brasil</a>. Código sob AGPL-3.0; dados curados sob CC BY 4.0.</p>'
         f"<p>Dados oficiais: {fontes}.</p>"
-        f'<p class="links"><a href="{raiz}index.html">Brasil</a><a href="{raiz}cargos.html">Entenda os cargos</a><a href="{raiz}como-calculamos.html">Como calculamos e de onde vêm os dados</a>'
+        f'<p class="links"><a href="{raiz}index.html">Brasil</a><a href="{raiz}cargos.html">Entenda os cargos</a><a href="{raiz}como-calculamos.html">Origens dos dados</a>'
         f'<a href="{correcao}">Encontrou um erro? Abra uma issue &#8599;</a><a href="{REPO}">Código no GitHub &#8599;</a></p></div></footer>\n'
         + tag_em_construcao(raiz, correcao)
         + f'<script src="{raiz}app.js" defer></script>\n</body>\n</html>\n'
@@ -135,10 +134,16 @@ def migalhas(itens: list[tuple[str, str | None]]) -> str:
     )
 
 
-def aviso_provisorio(capturado: date | None) -> str:
+def aviso_provisorio(capturado: date | None, atualizado: datetime | None = None) -> str:
+    """Selos do alto da página: o resultado é provisório e quando os dados foram atualizados."""
+    quando = (
+        f"Atualizado em {data_curta(atualizado)} às {atualizado:%H:%M}"
+        if atualizado
+        else f"TSE, capturado em {data_curta(capturado)}"
+    )
     return (
-        '<p class="aviso"><span class="selo provisorio">Resultado provisório</span> '
-        f"TSE, capturado em {data_curta(capturado)}. O resultado só é confirmado na diplomação.</p>"
+        '<p class="chips"><span class="selo provisorio">Resultado provisório</span>'
+        f'<span class="chip">{quando}</span></p>'
     )
 
 
@@ -224,16 +229,25 @@ def contar(eleitos: list[Row], cargos: tuple[str, ...]) -> Counter[str]:
 
 def _card_do_presidente(r: Row) -> str:
     """Foto, partido e votos de quem foi eleito presidente, com link para a ficha."""
+    turno = f" &middot; {r['turno']}º turno" if r.get("turno") else ""
     return (
-        '<div class="card presidente">'
-        + foto(r["foto_url"], r["nome_urna"], 88, r.get("foto_local"))
-        + f"<div><h3>Presidente da República</h3><p><b>{e(r['nome_urna'])}</b>, {e(r['partido'])}.</p>"
-        f"<p>{numero(r['qtd_votos'])} votos, {base_do_percentual(r)}. Eleito em {r['ano_eleicao']}.</p>"
-        f'<p><a href="pessoa/{arquivo_da_ficha(r["nome_urna"], r["id_candidatura"])}">Ver a ficha completa</a></p></div></div>'
+        '<a class="card presidente" href="pessoa/'
+        + arquivo_da_ficha(r["nome_urna"], r["id_candidatura"])
+        + '">'
+        + foto(r["foto_url"], r["nome_urna"], 72, r.get("foto_local"))
+        + f"<div><h3>Presidente da República</h3><p><b>{e(r['nome_urna'])}</b> &middot; {e(r['partido'])}</p>"
+        f"<p>{numero(r['qtd_votos'])} votos &middot; {percentual(r['percentual_votos_nominais'])}{turno}</p></div>"
+        '<i aria-hidden="true">&#8250;</i></a>'
     )
 
 
-def brasil(ano: int, eleitos: list[Row], situacao: list[Row], capturado: date | None) -> str:
+def brasil(
+    ano: int,
+    eleitos: list[Row],
+    situacao: list[Row],
+    capturado: date | None,
+    atualizado: datetime | None = None,
+) -> str:
     governos = [s for s in situacao if s["cargo"] == "Governador"]
     pend = sum(int(s["qtd_pendentes"]) for s in governos)
     presidente = [r for r in eleitos if r["cargo"] == "Presidente"]
@@ -252,11 +266,11 @@ def brasil(ano: int, eleitos: list[Row], situacao: list[Row], capturado: date | 
         faixa_de_titulo(
             "A composição do poder no Brasil",
             "Quem está no cargo",
-            f"Os eleitos nas eleições gerais de {ano}, pelos três poderes, de cima para baixo: federal, estadual e municipal.",
-            aviso_provisorio(capturado),
+            "A composição do poder público no Brasil, nos três poderes.",
+            aviso_provisorio(capturado, atualizado),
         ),
-        indice_dos_poderes(),
         atalhos_da_home(),
+        indice_dos_poderes(),
         '<div class="secao">',
         banda(*PODERES[0]),
         esfera("Federal", "Todo o Brasil"),
@@ -373,7 +387,7 @@ def pessoas(
         faixa_de_titulo(
             "Pessoas · todo o Brasil",
             "Todas as pessoas eleitas",
-            f"Quem foi eleito em {ano} e quem ainda está no mandato de uma eleição anterior, de todos os cargos e estados, em ordem alfabética. Procure por nome, partido ou estado.",
+            f"Quem foi eleito em {ano} e quem segue no mandato de uma eleição anterior.",
             aviso_provisorio(capturado),
         ),
         f'<div class="secao"><div class="lista" data-filtravel>{controles}<div class="itens lista-linhas">'
@@ -393,8 +407,8 @@ def atalhos_da_home() -> str:
     """Duas portas curtas no alto da home: o resto da página fica para o cenário geral."""
     return (
         '<div class="atalhos">'
-        '<a class="card" href="estados.html"><b>Ver um estado</b><span>Os 27 estados e o Distrito Federal</span></a>'
-        '<a class="card" href="pessoas.html"><b>Buscar uma pessoa</b><span>Todas as pessoas eleitas e em mandato</span></a>'
+        '<a class="card" href="estados.html"><b>Estados</b><span>27 estados e DF</span></a>'
+        '<a class="card" href="pessoas.html"><b>Pessoas</b><span>Busca por nome</span></a>'
         "</div>"
     )
 
@@ -568,33 +582,39 @@ def base_do_percentual(r: Row) -> str:
     return f"{percentual(r['percentual_votos_nominais'])} dos votos nominais para {str(r['cargo']).lower()} {onde}{turno}"
 
 
-def barra_de_mandato(rotulo: str, de: date, ate: date, hoje: date) -> str:
-    """Quanto do mandato já passou: título com o período, barra de progresso e o que falta; sem JavaScript."""
+def periodo_de(de: date, ate: date) -> str:
+    return f"{de.year} a {ate.year}" if de.year != ate.year else str(de.year)
+
+
+def barra_de_mandato(de: date, ate: date, hoje: date) -> str:
+    """Quanto do mandato já passou: barra de progresso e o que falta; sem JavaScript."""
     total = (ate - de).days + 1
     feito = min(max((hoje - de).days + 1, 0), total)
     pct = round(100 * feito / total)
     if hoje < de:
-        situacao = f"começa em {mes_ano(de)}"
+        esquerda, direita = f"começa em {mes_ano(de)}", ""
     elif hoje > ate:
-        situacao = "encerrado"
+        esquerda, direita = "encerrado", ""
     else:
         falta = (ate - hoje).days
-        situacao = f"faltam {falta} dias" if falta < 45 else f"faltam {tempo(hoje, ate)}"
-    periodo = f"{de.year} a {ate.year}" if de.year != ate.year else str(de.year)
+        esquerda = f"{pct}% cumprido"
+        direita = f"faltam {falta} dias" if falta < 45 else f"faltam {tempo(hoje, ate)}"
     return (
-        f'<div class="mandato{" futuro" if hoje < de else ""}"><div class="titulo"><b>{e(rotulo)}</b><span>{periodo}</span></div>'
-        f'<progress max="100" value="{pct}" aria-label="{e(rotulo)}: {pct}% cumprido">{pct}%</progress>'
-        f'<div class="legenda-barra"><span>{"ainda não começou" if hoje < de else f"{pct}% cumprido"}</span><span>{situacao}</span></div></div>'
+        f'<div class="barra{" futuro" if hoje < de else ""}">'
+        f'<progress max="100" value="{pct}" aria-label="{pct}% do mandato cumprido">{pct}%</progress>'
+        f"<div><span>{esquerda}</span><span>{direita}</span></div></div>"
     )
 
 
-def linha_do_tempo(itens: list[tuple[str, str, str, str]]) -> str:
-    """Cada item: tipo (proximo, atual, mandato, candidatura), título, linha 1 e linha 2."""
+def linha_do_tempo(itens: list[tuple[str, str, str, str, str]]) -> str:
+    """Cada item: tipo (proximo, atual, mandato, candidatura), título, linha 1, linha 2 e um bloco extra (a barra)."""
     return (
         '<ol class="tempo">'
         + "".join(
-            f'<li class="{tipo}"><span class="ponto"></span><div><b>{e(titulo)}</b><span>{e(a)}</span><small>{e(b)}</small></div></li>'
-            for tipo, titulo, a, b in itens
+            f'<li class="{tipo}"><span class="ponto"></span><div><b>{e(titulo)}</b><span>{a}</span>'
+            + (f"<small>{e(b)}</small>" if b else "")
+            + f"{extra}</div></li>"
+            for tipo, titulo, a, b, extra in itens
         )
         + "</ol>"
     )
@@ -708,14 +728,39 @@ def ficha(
         r["ano_eleicao"] + 1
     )  # a posse é no início do ano seguinte; a data exata não vem de fonte confiável
     atual = bool(r.get("em_exercicio"))  # eleito antes e ainda no mandato, fora da lista dos eleitos do ano
-    itens: list[tuple[str, str, str, str]] = []
+    oficial_m = next(
+        (m for m in mandatos_da_pessoa if m["dt_inicio"] and m["dt_fim"] and m["dt_fim"] >= hoje), None
+    )
+    previsto_tse = next(  # eleito antes para este cargo, com o mandato previsto ainda valendo hoje
+        (
+            c
+            for c in candidaturas_da_pessoa
+            if c["cargo"] == cargo
+            and c["ano_eleicao"] < r["ano_eleicao"]
+            and str(c["resultado"] or "").lower().startswith("eleito")
+            and c["ano_eleicao"] + 1 <= hoje.year <= c["ano_eleicao"] + anos
+        ),
+        None,
+    )
+    periodo_atual: tuple[date, date] | None = None
+    eleito_em_atual: int | None = None  # ano da eleição do mandato em curso, quando se sabe
+    if oficial_m:
+        periodo_atual = (oficial_m["dt_inicio"], oficial_m["dt_fim"])
+    elif atual:
+        periodo_atual, eleito_em_atual = (
+            (date(inicio, 1, 1), date(inicio + anos - 1, 12, 31)),
+            r["ano_eleicao"],
+        )
+    elif previsto_tse:
+        eleito_em_atual = previsto_tse["ano_eleicao"]
+        periodo_atual = (date(eleito_em_atual + 1, 1, 1), date(eleito_em_atual + anos, 12, 31))
+    itens: list[tuple[str, str, str, str, str]] = []
     passado: list[
-        tuple[int, tuple[str, str, str, str]]
+        tuple[int, tuple[str, str, str, str, str]]
     ] = []  # (ano, item): do mais recente para o mais antigo
     for m in mandatos_da_pessoa:
-        em_curso = m["dt_fim"] is None or m["dt_fim"] >= hoje
-        if em_curso:
-            continue  # o mandato em curso aparece na barra, acima da linha do tempo
+        if m["dt_fim"] is None or m["dt_fim"] >= hoje:
+            continue  # o mandato em curso aparece no topo da linha do tempo
         partido_do_mandato = next(
             (
                 c["partido"]
@@ -729,10 +774,10 @@ def ficha(
                 m["dt_inicio"].year,
                 (
                     "mandato",
-                    f"Mandato como {str(m['cargo']).lower()}",
-                    f"{mes_ano(m['dt_inicio'])} a {mes_ano(m['dt_fim'])}",
-                    (f"Pelo {partido_do_mandato}. " if partido_do_mandato else "")
-                    + f"Fonte: {'Senado Federal' if m['casa'] == 'Senado Federal' else 'Câmara dos Deputados'}.",
+                    f"Mandato de {periodo_de(m['dt_inicio'], m['dt_fim'])}",
+                    f"{m['cargo']}" + (f" &middot; {partido_do_mandato}" if partido_do_mandato else ""),
+                    f"Fonte: {'Senado Federal' if m['casa'] == 'Senado Federal' else 'Câmara dos Deputados'}.",
+                    "",
                 ),
             )
         )
@@ -743,16 +788,19 @@ def ficha(
         if eleito and c["cargo"] in ("Deputado federal", "Senador") and mandatos_da_pessoa:
             continue  # o mandato na Câmara ou no Senado já vem dessas casas
         if eleito:  # outros cargos: o TSE diz que foi eleito, e o mandato previsto é o da lei
+            if not oficial_m and c["ano_eleicao"] == eleito_em_atual and c["cargo"] == cargo:
+                continue  # é o mandato em curso, já mostrado no topo
             duracao = 8 if c["cargo"] == "Senador" else 4
             passado.append(
                 (
                     c["ano_eleicao"] + 1,
                     (
                         "mandato",
-                        f"Eleito em {c['ano_eleicao']}",
-                        f"{c['cargo']}, mandato previsto de {c['ano_eleicao'] + 1} a {c['ano_eleicao'] + duracao}",
-                        (f"Pelo {c['partido']}. " if c["partido"] else "")
-                        + "Fonte: TSE. O resultado da eleição não registra afastamentos.",
+                        f"Mandato de {c['ano_eleicao'] + 1} a {c['ano_eleicao'] + duracao}",
+                        f"Eleito em {c['ano_eleicao']} &middot; {c['cargo']}"
+                        + (f" &middot; {c['partido']}" if c["partido"] else ""),
+                        "Fonte: TSE, que não registra afastamentos.",
+                        "",
                     ),
                 )
             )
@@ -763,64 +811,65 @@ def ficha(
                 (
                     "candidatura",
                     f"Candidatura em {c['ano_eleicao']}",
-                    f"{c['cargo']}, {str(c['resultado'] or 'resultado não informado').lower()}",
-                    f"Pelo {c['partido']}." if c["partido"] else "",
+                    f"{c['cargo']}, {str(c['resultado'] or 'resultado não informado').lower()}"
+                    + (f" &middot; {c['partido']}" if c["partido"] else ""),
+                    "",
+                    "",
                 ),
             )
         )
+    if periodo_atual:
+        origem = (
+            f"Fonte: {'Senado Federal' if oficial_m['casa'] == 'Senado Federal' else 'Câmara dos Deputados'}."
+            if oficial_m
+            else "Previsto pelo TSE, que não registra afastamentos."
+        )
+        partido_atual = next(
+            (
+                c["partido"]
+                for c in candidaturas_da_pessoa
+                if c["cargo"] == cargo and c["ano_eleicao"] == periodo_atual[0].year - 1
+            ),
+            r["partido"] if atual else None,
+        )
+        itens.append(
+            (
+                "atual",
+                "Mandato atual",
+                periodo_de(*periodo_atual)
+                + (f" &middot; eleito em {eleito_em_atual}" if eleito_em_atual else "")
+                + (f" &middot; {partido_atual}" if partido_atual else ""),
+                origem,
+                barra_de_mandato(*periodo_atual, hoje),
+            )
+        )
+    if not atual:  # a eleição deste ano: o mandato que começa depois da posse
+        proximo = (date(inicio, 1, 1), date(inicio + anos - 1, 12, 31))
+        itens.insert(
+            0,
+            (
+                "proximo",
+                "Próximo mandato",
+                f"{periodo_de(*proximo)} &middot; eleito em {r['ano_eleicao']} &middot; {r['partido']}",
+                ""
+                if periodo_atual and not oficial_m
+                else "Previsto pelo TSE, que não registra afastamentos.",
+                barra_de_mandato(*proximo, hoje),
+            ),
+        )
     itens += [item for _, item in sorted(passado, key=lambda x: -x[0])]
     ja_eleito = any(str(c["resultado"] or "").lower().startswith("eleito") for c in candidaturas_da_pessoa)
-    oficial: tuple[date, date] | None = next(
-        (
-            (m["dt_inicio"], m["dt_fim"])
-            for m in mandatos_da_pessoa
-            if m["dt_inicio"] and m["dt_fim"] and m["dt_fim"] >= hoje
-        ),
-        None,
-    )
-    previsto_tse = next(  # eleito antes para este cargo, com o mandato previsto ainda valendo hoje
-        (
-            (date(c["ano_eleicao"] + 1, 1, 1), date(c["ano_eleicao"] + anos, 12, 31))
-            for c in candidaturas_da_pessoa
-            if c["cargo"] == cargo
-            and c["ano_eleicao"] < r["ano_eleicao"]
-            and str(c["resultado"] or "").lower().startswith("eleito")
-            and c["ano_eleicao"] + 1 <= hoje.year <= c["ano_eleicao"] + anos
-        ),
-        None,
-    )
-    periodo_atual: tuple[date, date] | None
-    if oficial:
-        periodo_atual = oficial
-    elif atual:
-        periodo_atual = (date(inicio, 1, 1), date(inicio + anos - 1, 12, 31))
-    else:
-        periodo_atual = previsto_tse
-    barras = (
-        barra_de_mandato("Mandato atual", periodo_atual[0], periodo_atual[1], hoje) if periodo_atual else ""
-    ) + (
-        barra_de_mandato("Próximo mandato", date(inicio, 1, 1), date(inicio + anos - 1, 12, 31), hoje)
-        if not atual
-        else ""
-    )
     if desde:
-        sem_barra = (
+        tempo_no_cargo = (
             f'<p class="nota">Há {tempo(desde, hoje)} no cargo, sem interrupção, desde {mes_ano(desde)}.</p>'
         )
     elif not ja_eleito and r["tipo_mandato"] != "novato" and not atual:
-        sem_barra = (
+        tempo_no_cargo = (
             '<p class="nota">Histórico de mandatos não confirmado: ainda não ligamos esta pessoa às eleições e aos '
             "mandatos anteriores. Isso não quer dizer que seja novata.</p>"
         )
     else:
-        sem_barra = ""
-    previstos = (periodo_atual is not None and oficial is None) or not atual
-    nota_previsto = (
-        '<p class="nota">Períodos previstos pelo resultado do TSE, que não registra afastamentos.</p>'
-        if barras and previstos
-        else ""
-    )
-    tempo_no_cargo = f'<div class="mandatos">{barras}</div>{nota_previsto}{sem_barra}'
+        tempo_no_cargo = ""
     casa_do_cargo = "no Senado Federal" if cargo == "Senador" else "na Câmara dos Deputados"
     outra_casa = any(
         m["casa"] != ("Senado Federal" if cargo == "Senador" else "Câmara dos Deputados")
@@ -872,15 +921,13 @@ def ficha(
         '<div class="secao">',
         aviso_novato,
         f'<h2>Tempo no cargo e mandatos</h2><div class="card">{tempo_no_cargo}{linha_do_tempo(itens)}'
-        '<p class="nota">Mandato exercido, mandato que vai começar e candidatura sem mandato aparecem com marcas diferentes. '
-        "Os mandatos da Câmara e do Senado vêm dessas casas; as eleições de outros cargos vêm do TSE e não registram afastamentos.</p></div>",
+        '<p class="nota">Mandatos da Câmara e do Senado vêm dessas casas; os demais, do TSE.</p></div>',
         f'<h2>A campanha de {r["ano_eleicao"]}</h2><div class="card">{campanha}</div>'
-        '<p class="nota">Bens: declarados ao TSE. Receita e gasto: prestação de contas ao TSE, com as despesas contratadas. '
-        "Quando o dado não foi entregue, mostramos Sem dado, nunca zero.</p>",
+        '<p class="nota">Bens e contas: declarados ao TSE. Sem dado quando não entregue, nunca zero.</p>',
         f'<p class="nota">Fonte: <a href="{e(r["fonte_url"])}">TSE, candidaturas {r["ano_eleicao"]}</a>, capturado em {data_curta(r["dt_captura"])}. '
-        + ("Foto: TSE, do registro da candidatura. " if r.get("foto_local") else "")
-        + f'Veja <a href="../como-calculamos.html">como calculamos</a>. '
-        f'Encontrou um erro neste dado? <a href="{seo.link_de_correcao(r["nome_urna"] + ", " + cargo, caminho)}">Abra uma issue</a>.</p>',
+        + ("Foto: TSE. " if r.get("foto_local") else "")
+        + f'<a href="../como-calculamos.html">Como calculamos</a>. '
+        f'<a href="{seo.link_de_correcao(r["nome_urna"] + ", " + cargo, caminho)}">Encontrou um erro?</a></p>',
         "</div>",
     ]
     estado = nome_do_local(r["uf"])
