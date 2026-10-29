@@ -60,6 +60,19 @@ FONTES = (
 )
 
 
+def _links_externos_em_nova_guia(html: str) -> str:
+    """Todo link para fora do site (fontes oficiais, redes e sites dos eleitos, repositório) abre em outra guia."""
+
+    def ajusta(m: re.Match[str]) -> str:
+        tag = m.group(0)
+        if "target=" in tag or seo.SITE in m.group(1):
+            return tag
+        tag = re.sub(r'\srel="[^"]*"', "", tag)
+        return tag[:-1] + ' target="_blank" rel="noopener noreferrer">'
+
+    return re.sub(r'<a\s[^>]*?href="(https?://[^"]+)"[^>]*>', ajusta, html)
+
+
 def pagina(
     titulo: str,
     corpo: str,
@@ -78,7 +91,7 @@ def pagina(
     descricao = descricao or "Quem ocupa o poder no Brasil, pelos três poderes, com a fonte oficial ao lado."
     busca = seo.cabecalho(titulo, descricao, caminho, schema) if caminho is not None else ""
     correcao = seo.link_de_correcao(titulo, caminho or "")
-    return (
+    return _links_externos_em_nova_guia(
         '<!doctype html>\n<html lang="pt-BR" data-theme="light">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         f"<title>{e(titulo)} | No Cargo</title>\n"
@@ -150,11 +163,12 @@ def aviso_provisorio(capturado: date | None, atualizado: datetime | None = None)
 ID_DO_PODER = {"1": "executivo", "2": "legislativo", "3": "judiciario"}
 
 
-def indice_dos_poderes() -> str:
+def indice_dos_poderes(sufixo: str = "") -> str:
     return (
         '<nav class="indice" aria-label="Nesta página">'
         + "".join(
-            f'<a href="#poder-{ID_DO_PODER[n]}">{nome.removeprefix("Poder ")}</a>' for n, nome, *_ in PODERES
+            f'<a href="#poder-{ID_DO_PODER[n]}{sufixo}">{nome.removeprefix("Poder ")}</a>'
+            for n, nome, *_ in PODERES
         )
         + "</nav>"
     )
@@ -172,9 +186,9 @@ def tag_em_construcao(raiz: str, correcao: str) -> str:
     )
 
 
-def banda(numero_: str, nome: str, descricao: str, quem: str = "") -> str:
+def banda(numero_: str, nome: str, descricao: str, quem: str = "", sufixo: str = "") -> str:
     return (
-        f'<div class="poder" id="poder-{ID_DO_PODER[numero_]}"><h2>{e(nome)}</h2>'
+        f'<div class="poder" id="poder-{ID_DO_PODER[numero_]}{sufixo}"><h2>{e(nome)}</h2>'
         f"<p>{e(descricao)}</p>" + (f'<p class="quem">{e(quem)}</p>' if quem else "") + "</div>"
     )
 
@@ -232,7 +246,7 @@ def _card_do_presidente(r: Row) -> str:
     turno = f" &middot; {r['turno']}º turno" if r.get("turno") else ""
     return (
         '<a class="card presidente" href="pessoa/'
-        + arquivo_da_ficha(r["nome_urna"], r["id_candidatura"])
+        + (r.get("ficha") or arquivo_da_ficha(r["nome_urna"], r["id_candidatura"]))
         + '">'
         + foto(r["foto_url"], r["nome_urna"], 72, r.get("foto_local"))
         + f"<div><h3>Presidente da República</h3><p><b>{e(r['nome_urna'])}</b> &middot; {e(r['partido'])}</p>"
@@ -241,16 +255,27 @@ def _card_do_presidente(r: Row) -> str:
     )
 
 
-def brasil(
-    ano: int,
-    eleitos: list[Row],
-    situacao: list[Row],
-    capturado: date | None,
-    atualizado: datetime | None = None,
-) -> str:
-    governos = [s for s in situacao if s["cargo"] == "Governador"]
-    pend = sum(int(s["qtd_pendentes"]) for s in governos)
-    presidente = [r for r in eleitos if r["cargo"] == "Presidente"]
+VISOES = (("hoje", "Hoje"), ("posse", "Depois da posse"))
+
+
+def seletor_de_visao() -> tuple[str, str]:
+    """Os botões de escolha e o controle: a página traz as duas composições e o CSS mostra uma (sem JavaScript)."""
+    entradas = "".join(
+        f'<input type="radio" name="visao" id="visao-{chave}" class="so-leitor"{" checked" if chave == "hoje" else ""}>'
+        for chave, _ in VISOES
+    )
+    controle = (
+        '<div class="visoes" role="group" aria-label="Composição">'
+        + "".join(f'<label for="visao-{chave}">{rotulo}</label>' for chave, rotulo in VISOES)
+        + "</div>"
+    )
+    return entradas, controle
+
+
+def _poderes_do_brasil(linhas: list[Row], sufixo: str, pendentes: int) -> str:
+    """Os três poderes com a composição de `linhas`; `sufixo` deixa as âncoras únicas quando há mais de uma visão."""
+    governadores = [r for r in linhas if r["cargo"] == "Governador"]
+    presidente = [r for r in linhas if r["cargo"] == "Presidente"]
     pres_card = (
         _card_do_presidente(presidente[0])
         if presidente
@@ -258,46 +283,41 @@ def brasil(
         "Quando o TSE divulgar, o eleito aparece aqui.</p></div>"
     )
     selos_dep = Counter(
-        r["tipo_mandato"] for r in eleitos if r["cargo"] == "Deputado federal" and r["tipo_mandato"]
+        r["tipo_mandato"] for r in linhas if r["cargo"] == "Deputado federal" and r["tipo_mandato"]
     )
-    selos_sen = Counter(r["tipo_mandato"] for r in eleitos if r["cargo"] == "Senador" and r["tipo_mandato"])
-    legislativo_estadual = contar(eleitos, ("Deputado estadual", "Deputado distrital"))
-    corpo = [
-        faixa_de_titulo(
-            "A composição do poder no Brasil",
-            "Quem está no cargo",
-            "A composição do poder público no Brasil, nos três poderes.",
-            aviso_provisorio(capturado, atualizado),
-        ),
-        atalhos_da_home(),
-        indice_dos_poderes(),
+    selos_sen = Counter(r["tipo_mandato"] for r in linhas if r["cargo"] == "Senador" and r["tipo_mandato"])
+    legislativo_estadual = contar(linhas, ("Deputado estadual", "Deputado distrital"))
+    deputados = sum(1 for r in linhas if r["cargo"] == "Deputado federal")
+    senadores = sum(1 for r in linhas if r["cargo"] == "Senador")
+    partes = [
+        indice_dos_poderes(sufixo),
         '<div class="secao">',
-        banda(*PODERES[0]),
+        banda(*PODERES[0], sufixo=sufixo),
         esfera("Federal", "Todo o Brasil"),
         pres_card,
         esfera("Estadual", "27 estados e o Distrito Federal"),
         casa(
             "Governos estaduais",
-            f"{len(governos)} estados, {len(governos) - pend} já definidos",
-            contar(eleitos, ("Governador",)),
-            pend,
+            f"{len(governadores)} governadores" + (f", {pendentes} ainda por definir" if pendentes else ""),
+            contar(linhas, ("Governador",)),
+            pendentes,
         ),
         esfera("Municipal", "5.570 cidades"),
         em_construcao("Prefeitos", "Quem comanda cada cidade."),
-        banda(*PODERES[1]),
+        banda(*PODERES[1], sufixo=sufixo),
         esfera("Federal", "Congresso Nacional, em Brasília"),
         casa(
             "Câmara dos Deputados",
-            f"{sum(1 for r in eleitos if r['cargo'] == 'Deputado federal')} eleitos em {ano}",
-            contar(eleitos, ("Deputado federal",)),
+            f"{deputados} deputados",
+            contar(linhas, ("Deputado federal",)),
             0,
             selos_dep,
             "deputados",
         ),
         casa(
             "Senado Federal",
-            f"{sum(1 for r in eleitos if r['cargo'] == 'Senador')} cadeiras em disputa em {ano}",
-            contar(eleitos, ("Senador",)),
+            f"{senadores} senadores",
+            contar(linhas, ("Senador",)),
             0,
             selos_sen,
             "senadores",
@@ -305,13 +325,13 @@ def brasil(
         esfera("Estadual", "Capitais dos estados"),
         casa(
             "Assembleias Legislativas e Câmara Legislativa",
-            f"{sum(legislativo_estadual.values())} eleitos em {ano}",
+            f"{sum(legislativo_estadual.values())} deputados",
             legislativo_estadual,
             rotulo="deputados",
         ),
         esfera("Municipal", "5.570 cidades"),
         em_construcao("Câmaras de vereadores", "Quem faz as leis de cada cidade."),
-        banda(*PODERES[2]),
+        banda(*PODERES[2], sufixo=sufixo),
         esfera("Federal", "Tribunais superiores, em Brasília"),
         em_construcao(
             "Supremo Tribunal Federal e tribunais superiores",
@@ -320,13 +340,43 @@ def brasil(
         esfera("Estadual", "Tribunais de cada estado"),
         em_construcao("Tribunais de Justiça", "Os desembargadores de cada estado."),
         "</div>",
+    ]
+    return "\n".join(partes)
+
+
+def brasil(
+    ano: int,
+    visoes: dict[str, list[Row]],
+    situacao: list[Row],
+    capturado: date | None,
+    atualizado: datetime | None = None,
+) -> str:
+    """A composição do poder: `visoes` traz quem ocupa os cargos hoje e depois da posse, e a página mostra uma por vez."""
+    pendentes = sum(int(s["qtd_pendentes"]) for s in situacao if s["cargo"] == "Governador")
+    entradas, controle = seletor_de_visao()
+    corpo = [
+        entradas,
+        faixa_de_titulo(
+            "A composição do poder no Brasil",
+            "Quem está no cargo",
+            "A composição do poder público no Brasil, nos três poderes.",
+            aviso_provisorio(capturado, atualizado),
+        ),
+        controle,
+        atalhos_da_home(),
+        *(
+            f'<div class="visao visao-{chave}">'
+            + _poderes_do_brasil(visoes[chave], f"-{chave}", pendentes if chave == "posse" else 0)
+            + "</div>"
+            for chave, _ in VISOES
+        ),
         legenda_dos_selos(),
     ]
     return pagina(
         "Brasil",
         "\n".join(corpo),
         "inicio",
-        descricao=f"Quem foi eleito em {ano}: composição de cada casa por partido, pelos três poderes, com a fonte oficial ao lado.",
+        descricao=f"Quem ocupa o poder no Brasil hoje e depois da posse de {ano + 1}: composição de cada casa por partido, pelos três poderes, com a fonte oficial ao lado.",
         caminho="index.html",
         schema=[seo.site_schema()],
     )
@@ -382,11 +432,11 @@ def pessoas(
         '<button type="button" data-grupo="" aria-pressed="true">Todos</button>'
         f'<button type="button" data-grupo="novo" aria-pressed="false">Eleitos em {ano}</button>'
         '<button type="button" data-grupo="atual" aria-pressed="false">Em mandato</button></div>'
-        '<div class="selecoes"><label>Cargo<select id="filtro-cargo">' + opcoes_cargo + "</select></label>"
-        '<label>Tipo de mandato<select id="filtro-tipo"><option value="">Todos</option>'
+        '<div class="selecoes"><label>Cargo<select data-filtro="cargo">' + opcoes_cargo + "</select></label>"
+        '<label>Tipo de mandato<select data-filtro="tipo"><option value="">Todos</option>'
         + opcoes_de_tipo(todos)
         + "</select></label>"
-        '<label>Ordenar por<select id="filtro-ordem"><option value="nome">Nome</option>'
+        '<label>Ordenar por<select data-filtro="ordem"><option value="nome">Nome</option>'
         '<option value="uf">Estado</option><option value="partido">Partido</option></select></label></div>'
         '<p class="contagem" aria-live="polite"></p></div>'
     )
@@ -468,10 +518,13 @@ def legenda_dos_selos() -> str:
 
 
 def cartao_de_pessoa(r: Row) -> str:
-    detalhe = f"{e(r['partido'])} &middot; {numero(r['qtd_votos'])} votos"
+    detalhe = f"{e(r['partido'])} &middot; {numero(r['qtd_votos'])} votos" + (
+        "" if r.get("novo") else f" &middot; eleito em {r['ano_eleicao']}"
+    )
     return (
-        f'<a class="card pessoa" href="../pessoa/{arquivo_da_ficha(r["nome_urna"], r["id_candidatura"])}" data-nome="{e(str(r["nome_urna"]).lower())}" '
+        f'<a class="card pessoa" href="../pessoa/{r.get("ficha") or arquivo_da_ficha(r["nome_urna"], r["id_candidatura"])}" data-nome="{e(str(r["nome_urna"]).lower())}" '
         f'data-partido="{e(str(r["partido"]).lower())}" data-tipo="{e(r["tipo_mandato"] or "sem")}" '
+        f'data-grupo="{"novo" if r.get("novo") else "antes"}" '
         f'data-votos="{r["qtd_votos"] or 0}">{foto(r["foto_url"], r["nome_urna"], 60, r.get("foto_local"), "../")}'
         f'<span class="dados"><b>{e(r["nome_urna"])}</b><span>{detalhe}</span>{selo(r["tipo_mandato"], r["cargo"])}</span>'
         '<i aria-hidden="true">&#8250;</i></a>'
@@ -485,18 +538,26 @@ def opcoes_de_tipo(eleitos: list[Row]) -> str:
     return "".join(f'<option value="{t}">{nome} ({contagem[t]})</option>' for t, nome in nomes if contagem[t])
 
 
-def lista_filtravel(eleitos: list[Row], com_selos: bool, titulo: str) -> str:
+def lista_filtravel(eleitos: list[Row], com_selos: bool, titulo: str, sufixo: str = "") -> str:
     por_tipo = (
-        '<label>Tipo de mandato<select id="filtro-tipo"><option value="">Todos</option>'
+        '<label>Tipo de mandato<select data-filtro="tipo"><option value="">Todos</option>'
         + opcoes_de_tipo(eleitos)
         + "</select></label>"
         if com_selos
         else ""
     )
+    novos = sum(1 for r in eleitos if r.get("novo"))
+    por_eleicao = (
+        '<label>Eleição<select data-filtro="grupo"><option value="">Todas</option>'
+        f'<option value="novo">Eleitos em 2026 ({novos})</option>'
+        f'<option value="antes">Eleitos antes ({len(eleitos) - novos})</option></select></label>'
+        if 0 < novos < len(eleitos)
+        else ""
+    )
     controles = (
-        '<div class="card controles"><label class="so-leitor" for="busca">Buscar por nome ou partido</label>'
-        '<input id="busca" type="search" placeholder="Buscar por nome ou partido" autocomplete="off">'
-        f'<div class="selecoes">{por_tipo}<label>Ordenar por<select id="filtro-ordem">'
+        f'<div class="card controles"><label class="so-leitor" for="busca{sufixo}">Buscar por nome ou partido</label>'
+        f'<input id="busca{sufixo}" type="search" placeholder="Buscar por nome ou partido" autocomplete="off">'
+        f'<div class="selecoes">{por_eleicao}{por_tipo}<label>Ordenar por<select data-filtro="ordem">'
         '<option value="nome">Nome</option><option value="votos">Votos</option>'
         '<option value="partido">Partido</option></select></label></div>'
         '<p class="contagem" aria-live="polite"></p></div>'
@@ -509,9 +570,8 @@ def lista_filtravel(eleitos: list[Row], com_selos: bool, titulo: str) -> str:
     )
 
 
-def estado(uf: str, ano: int, eleitos: list[Row], situacao: list[Row], capturado: date | None) -> str:
-    nome, _ = UFS[uf]
-    doestado = [r for r in eleitos if r["uf"] == uf]
+def _poderes_do_estado(uf: str, nome: str, linhas: list[Row], sufixo: str) -> str:
+    doestado = [r for r in linhas if r["uf"] == uf]
     por_cargo = {c: [r for r in doestado if r["cargo"] == c] for c in (*EXECUTIVO, *LEGISLATIVO)}
     gov = por_cargo["Governador"]
     gov_html = (
@@ -522,27 +582,20 @@ def estado(uf: str, ano: int, eleitos: list[Row], situacao: list[Row], capturado
     )
     deputados = por_cargo["Deputado federal"]
     estaduais = [*por_cargo["Deputado estadual"], *por_cargo["Deputado distrital"]]
-    corpo = [
-        migalhas([("Brasil", "../index.html"), (nome, None)]),
-        faixa_de_titulo(
-            f"Estado · {uf}",
-            nome,
-            f"Quem está no cargo. Mostramos os eleitos em {ano}, que assumem em {ano + 1}.",
-            aviso_provisorio(capturado),
-        ),
-        indice_dos_poderes(),
+    partes = [
+        indice_dos_poderes(sufixo),
         '<div class="secao">',
-        banda(*PODERES[0][:3]),
+        banda(*PODERES[0][:3], sufixo=sufixo),
         esfera("Estadual", "No estado"),
         "<h3>Governador</h3>",
         gov_html,
         esfera("Municipal", "Cidades do estado"),
         em_construcao("Prefeitos", "Quem comanda cada cidade do estado."),
-        banda(*PODERES[1][:3]),
+        banda(*PODERES[1][:3], sufixo=sufixo),
         esfera("Federal", "Representam o estado em Brasília"),
-        "<h3>Senadores</h3>",
+        f"<h3>Senadores ({len(por_cargo['Senador'])})</h3>",
         "".join(cartao_de_pessoa(r) for r in por_cargo["Senador"])
-        or '<p class="nota">Sem senadores eleitos neste ano.</p>',
+        or '<p class="nota">Sem senadores neste estado.</p>',
         f"<h3>Deputados federais ({len(deputados)})</h3>",
         casa(
             "Bancada federal por partido",
@@ -550,7 +603,7 @@ def estado(uf: str, ano: int, eleitos: list[Row], situacao: list[Row], capturado
             contar(doestado, ("Deputado federal",)),
             rotulo="deputados",
         ),
-        lista_filtravel(deputados, True, "Deputados federais"),
+        lista_filtravel(deputados, True, "Deputados federais", sufixo),
         esfera("Estadual", "Assembleia Legislativa"),
         f"<h3>Deputados estaduais e distritais ({len(estaduais)})</h3>",
         casa(
@@ -559,16 +612,39 @@ def estado(uf: str, ano: int, eleitos: list[Row], situacao: list[Row], capturado
             contar(doestado, ("Deputado estadual", "Deputado distrital")),
             rotulo="deputados",
         ),
-        lista_filtravel(estaduais, False, "Deputados estaduais e distritais"),
+        lista_filtravel(estaduais, False, "Deputados estaduais e distritais", f"{sufixo}-e"),
         esfera("Municipal", "Cidades do estado"),
         em_construcao("Vereadores", "Os eleitos de cada cidade do estado."),
-        banda(*PODERES[2][:3]),
+        banda(*PODERES[2][:3], sufixo=sufixo),
         esfera("Estadual", "Tribunal de Justiça e Tribunal Regional Eleitoral"),
         em_construcao(
             "Tribunais do estado",
             "Os desembargadores do Tribunal de Justiça e do Tribunal Regional Eleitoral. Não são eleitos.",
         ),
         "</div>",
+    ]
+    return "\n".join(partes)
+
+
+def estado(uf: str, ano: int, visoes: dict[str, list[Row]], capturado: date | None) -> str:
+    nome, _ = UFS[uf]
+    entradas, controle = seletor_de_visao()
+    corpo = [
+        entradas,
+        migalhas([("Brasil", "../index.html"), (nome, None)]),
+        faixa_de_titulo(
+            f"Estado · {uf}",
+            nome,
+            f"Quem ocupa os cargos hoje e quem assume em {ano + 1}.",
+            aviso_provisorio(capturado),
+        ),
+        controle,
+        *(
+            f'<div class="visao visao-{chave}">'
+            + _poderes_do_estado(uf, nome, visoes[chave], f"-{chave}")
+            + "</div>"
+            for chave, _ in VISOES
+        ),
         legenda_dos_selos(),
     ]
     return pagina(
@@ -576,7 +652,7 @@ def estado(uf: str, ano: int, eleitos: list[Row], situacao: list[Row], capturado
         "\n".join(corpo),
         "",
         raiz="../",
-        descricao=f"Governador, senadores e deputados eleitos em {nome} em {ano}, com histórico, selo e a fonte oficial.",
+        descricao=f"Governador, senadores e deputados de {nome} hoje e depois da posse de {ano + 1}, com histórico, selo e a fonte oficial.",
         caminho=f"estado/{uf}.html",
         schema=[seo.migalhas([("Brasil", "index.html"), (nome, f"estado/{uf}.html")])],
     )

@@ -50,6 +50,22 @@ def trazer_fotos(pessoas: list[dados.Row], origem: Path | None, saida: Path) -> 
     return trazidas
 
 
+def ligar_as_fichas(pessoas: list[dados.Row], visoes: dict[str, list[dados.Row]], ano: int) -> None:
+    """Cada pessoa tem uma ficha só: quem foi reeleito usa a da eleição nova. Marca as linhas de cada
+    composição com a ficha, a foto local e se é eleito do ano (os cartões usam isso)."""
+    por_pessoa = {r["id_pessoa"]: r for r in pessoas if r["id_pessoa"]}
+    for linhas in visoes.values():
+        for r in linhas:
+            dona = por_pessoa.get(r["id_pessoa"])
+            if dona is None:
+                continue
+            r["ficha"] = arquivo_da_ficha(dona["nome_urna"], dona["id_candidatura"])
+            r["foto_local"] = dona.get("foto_local")
+            r["novo"] = dona["ano_eleicao"] == ano
+    for r in pessoas:
+        r["novo"] = r["ano_eleicao"] == ano
+
+
 def construir(
     con: dados.Connection,
     saida: Path,
@@ -63,11 +79,15 @@ def construir(
     ano = dados.ultimo_ano(con)
     eleitos = dados.eleitos(con, ano)
     atuais = dados.em_exercicio(con, hoje, eleitos)
+    hoje_linhas = dados.ocupantes(con, hoje)
+    posse_linhas = dados.na_posse(con, hoje, eleitos)
     situacao = dados.situacao_dos_cargos(con, ano)
     capturado = max((r["dt_captura"] for r in situacao if r["dt_captura"]), default=None)
     saida.mkdir(parents=True, exist_ok=True)
     shutil.copytree(ESTATICOS, saida, dirs_exist_ok=True)  # css, js, símbolo e fontes (arquivos binários)
     trazer_fotos([*eleitos, *atuais], fotos, saida)
+    visoes = {"hoje": hoje_linhas, "posse": posse_linhas}
+    ligar_as_fichas([*eleitos, *atuais], visoes, ano)
     escritas: list[str] = [
         "index.html",
         "pessoas.html",
@@ -75,7 +95,7 @@ def construir(
         "cargos.html",
         "como-calculamos.html",
     ]
-    escrever(saida / "index.html", paginas.brasil(ano, eleitos, situacao, capturado, agora))
+    escrever(saida / "index.html", paginas.brasil(ano, visoes, situacao, capturado, agora))
     escrever(
         saida / "pessoas.html",
         paginas.pessoas(ano, eleitos, capturado, atuais, dados.ids_em_mandato(con, hoje)),
@@ -85,7 +105,7 @@ def construir(
     escrever(saida / "como-calculamos.html", textos.como_calculamos())
     total = 5
     for uf in paginas.UFS:
-        escrever(saida / "estado" / f"{uf}.html", paginas.estado(uf, ano, eleitos, situacao, capturado))
+        escrever(saida / "estado" / f"{uf}.html", paginas.estado(uf, ano, visoes, capturado))
         escritas.append(f"estado/{uf}.html")
         total += 1
     pessoas = [*eleitos, *atuais]

@@ -42,7 +42,9 @@ def test_brazil_page_separates_the_three_powers_and_their_spheres(warehouse, tmp
     )
     for esfera in ("Federal", "Estadual", "Municipal"):
         assert esfera in pagina
-    assert pagina.count('class="card obra"') == 4  # prefeitos, vereadores e os dois blocos do Judiciário
+    assert (
+        pagina.count('class="card obra"') == 8
+    )  # prefeitos, vereadores e o Judiciário, nas duas composições
     assert "Aguardando o resultado do 2º turno" in pagina  # o presidente ainda não tem eleito
 
 
@@ -220,10 +222,11 @@ def test_header_has_one_home_link_the_repo_and_the_project_symbol(warehouse, tmp
 def test_state_page_collapses_long_lists_and_links_to_the_three_powers(warehouse, tmp_path):
     pagina = texto(site(warehouse, tmp_path), "estado/RJ.html")
     assert (
-        pagina.count('<details class="recolhivel">') == 2 and '<details class="recolhivel" open' not in pagina
+        pagina.count('<details class="recolhivel">') == 4 and '<details class="recolhivel" open' not in pagina
     )
     for poder in ("executivo", "legislativo", "judiciario"):
-        assert f'href="#poder-{poder}"' in pagina and f'id="poder-{poder}"' in pagina
+        for visao in ("hoje", "posse"):
+            assert f'href="#poder-{poder}-{visao}"' in pagina and f'id="poder-{poder}-{visao}"' in pagina
 
 
 def test_the_mandates_come_from_the_base_with_their_dates(warehouse):
@@ -293,7 +296,7 @@ def test_state_and_person_pages_say_where_you_are_and_link_back(warehouse, tmp_p
 def test_powers_are_section_headings_and_the_css_has_no_heavy_borders(warehouse, tmp_path):
     saida = site(warehouse, tmp_path)
     brasil = texto(saida, "index.html")
-    assert brasil.count('class="poder"') == 3 and "<h2>Poder Executivo</h2>" in brasil
+    assert brasil.count('class="poder"') == 6 and "<h2>Poder Executivo</h2>" in brasil
     css = texto(saida, "style.css")
     assert not re.search(
         r"border[a-z-]*:[^;}]*\b[2-9]px (solid|dashed)",
@@ -328,7 +331,12 @@ def test_the_menu_has_no_origens_the_footer_does_and_the_home_has_the_powers_ind
     nav = topo[topo.index('<nav class="nav"') : topo.index("</nav>")]
     assert ">Origens<" not in nav and "Método" not in topo and 'class="gh"' in topo and REPO in topo
     assert ">Origens dos dados</a>" in brasil[brasil.index('<footer class="rodape">') :]
-    assert 'href="#poder-executivo"' in brasil and "Poder 1" not in brasil and "poder-num" not in brasil
+    assert (
+        'href="#poder-executivo-hoje"' in brasil
+        and 'href="#poder-executivo-posse"' in brasil
+        and "Poder 1" not in brasil
+        and "poder-num" not in brasil
+    )
 
 
 def test_the_people_page_lists_everyone_elected_in_alphabetical_order_without_ranking(warehouse, tmp_path):
@@ -351,7 +359,7 @@ def test_the_people_page_lists_everyone_elected_in_alphabetical_order_without_ra
     )  # sem ordem por votos e sem foto (página leve)
     assert 'data-cargo="Senador"' in pagina and ">Pessoas</a>" in texto(saida, "index.html")
     assert 'href="pessoas.html"' in texto(saida, "index.html")
-    assert "filtro-cargo" in texto(saida, "app.js")
+    assert "data-filtro" in texto(saida, "app.js")
 
 
 def test_every_page_can_be_found_canonical_description_share_card_and_structured_data(warehouse, tmp_path):
@@ -629,11 +637,12 @@ def test_the_in_office_filter_includes_whoever_was_reelected(warehouse, tmp_path
 
 def test_the_campaign_note_links_to_the_sources_and_says_when_they_were_captured(warehouse, tmp_path):
     ana = texto(site(warehouse, tmp_path), "pessoa/ana-exemplo-2026-rj-1.html")
-    assert 'href="https://exemplo.gov.br/bens.zip">bens declarados</a>' in ana
     assert (
-        'href="https://exemplo.gov.br/contas.zip">prestação de contas</a> ao TSE, capturado em 24/10/2026'
+        'href="https://exemplo.gov.br/bens.zip" target="_blank" rel="noopener noreferrer">bens declarados</a>'
         in ana
     )
+    assert 'target="_blank" rel="noopener noreferrer">prestação de contas</a>' in ana
+    assert "ao TSE, capturado em 24/10/2026" in ana
 
 
 def test_the_badges_of_the_mandate_type_come_from_the_base(warehouse, tmp_path):
@@ -657,7 +666,7 @@ def test_a_mandate_without_a_start_date_shows_only_the_year_and_says_so(warehous
 def test_the_people_page_filters_by_novato_reeleito_and_retorno(warehouse, tmp_path):
     pagina = texto(site(warehouse, tmp_path), "pessoas.html")
     assert (
-        'id="filtro-tipo"' in pagina
+        'data-filtro="tipo"' in pagina
         and "Novatos (" in pagina
         and "Reeleitos (" in pagina
         and "Retorno (" in pagina
@@ -665,3 +674,32 @@ def test_the_people_page_filters_by_novato_reeleito_and_retorno(warehouse, tmp_p
     ana = pagina[pagina.index('href="pessoa/ana-exemplo-2026-rj-1.html"') :].split(">", 1)[0]
     assert 'data-tipo="reeleito"' in ana
     assert 'data-tipo="retorno"' in pagina
+
+
+def test_the_home_has_the_whole_composition_today_and_after_the_inauguration(warehouse, tmp_path):
+    saida = site(warehouse, tmp_path)
+    inicio = texto(saida, "index.html")
+    assert 'id="visao-hoje"' in inicio and 'id="visao-posse"' in inicio and 'for="visao-posse"' in inicio
+    # hoje: Gil, Gov Anterior, Sena Antiga e Ana (mandato de 2022) em exercício; depois da posse entram os de 2026
+    assert 'class="visao visao-hoje"' in inicio and 'class="visao visao-posse"' in inicio
+
+
+def test_state_senators_include_the_ones_elected_before_2026_after_the_inauguration(warehouse, tmp_path):
+    rj = texto(site(warehouse, tmp_path), "estado/RJ.html")
+    posse = rj[rj.index('class="visao visao-posse"') :]
+    assert "Paulo Exemplo" in posse and "Sena Antiga" not in posse  # a de 2018 acaba em 2026
+    hoje = rj[rj.index('class="visao visao-hoje"') : rj.index('class="visao visao-posse"')]
+    assert "Sena Antiga" in hoje and "Paulo Exemplo" not in hoje
+    assert "eleito em 2018" in hoje and "eleito em 2018" not in posse  # a eleição de quem já estava no cargo
+
+
+def test_links_to_other_sites_open_in_a_new_tab_and_internal_ones_do_not(warehouse, tmp_path):
+    saida = site(warehouse, tmp_path)
+    ana = texto(saida, "pessoa/ana-exemplo-2026-rj-1.html")
+    for tag in re.findall(r"<a\s[^>]*>", ana):
+        href = re.search(r'href="([^"]*)"', tag).group(1)
+        if href.startswith("http") and not href.startswith(seo.SITE):
+            assert 'target="_blank"' in tag and 'rel="noopener noreferrer"' in tag, tag
+        else:
+            assert "target=" not in tag, tag
+    assert 'href="https://www.instagram.com/' in ana

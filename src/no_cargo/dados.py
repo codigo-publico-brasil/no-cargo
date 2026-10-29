@@ -90,6 +90,22 @@ def data_da_posse(con: Connection, hoje: date) -> date | None:
     return linha[0]["posse"] if linha else None
 
 
+def na_posse(con: Connection, hoje: date, eleitos_do_ano: list[Row]) -> list[Row]:
+    """A composição depois da posse: quem ocupa os cargos no dia em que a composição das urnas está completa, mais
+    os eleitos do ano que a base ainda não data (hoje, os deputados estaduais e distritais)."""
+    posse = data_da_posse(con, hoje)
+    if posse is None:
+        return []
+    sem_data = [r for r in eleitos_do_ano if r["dt_inicio"] is None]
+    renovadas = {(r["cargo"], r["uf"]) for r in sem_data}  # a casa inteira é renovada: o mandato antigo acaba
+    ano = max((r["ano_eleicao"] for r in eleitos_do_ano), default=0)
+    linhas = [
+        r for r in ocupantes(con, posse) if (r["cargo"], r["uf"]) not in renovadas or r["ano_eleicao"] == ano
+    ]
+    vistos = {r["id_candidatura"] for r in linhas}
+    return [*linhas, *(r for r in sem_data if r["id_candidatura"] not in vistos)]
+
+
 def em_exercicio(con: Connection, hoje: date, eleitos_do_ano: list[Row]) -> list[Row]:
     """Quem ocupa o cargo hoje e não está entre os eleitos do ano (os reeleitos têm ficha pela eleição nova).
     Cada linha leva `em_exercicio = True`."""

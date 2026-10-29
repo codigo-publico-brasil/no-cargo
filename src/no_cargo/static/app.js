@@ -42,12 +42,10 @@
         aplicar();
       });
     });
-    var porTipo = lista.querySelector("#filtro-tipo");
-    if (porTipo) { porTipo.addEventListener("change", function () { estado.tipo = porTipo.value; aplicar(); }); }
-    var porCargo = lista.querySelector("#filtro-cargo");
-    if (porCargo) { porCargo.addEventListener("change", function () { estado.cargo = porCargo.value; aplicar(); }); }
-    var porOrdem = lista.querySelector("#filtro-ordem");
-    if (porOrdem) { porOrdem.addEventListener("change", function () { estado.ordem = porOrdem.value; aplicar(); }); }
+    [["tipo", "tipo"], ["cargo", "cargo"], ["grupo", "grupo"], ["ordem", "ordem"]].forEach(function (par) {
+      var campo = lista.querySelector('[data-filtro="' + par[0] + '"]');
+      if (campo) { campo.addEventListener("change", function () { estado[par[1]] = campo.value; aplicar(); }); }
+    });
     aplicar();
   });
 
