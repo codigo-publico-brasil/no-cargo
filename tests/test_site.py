@@ -717,3 +717,22 @@ def test_a_mandate_without_an_election_still_shows_up_and_does_not_repeat_one_th
     pagina = texto(site(warehouse, tmp_path), "pessoa/ana-exemplo-2026-rj-1.html")
     assert pagina.count("Mandato de 2019 a 2022") == 1
     assert "Mandato de 2003 a 2007" in pagina
+
+
+def test_whoever_is_in_office_without_an_election_of_their_own_still_counts_in_the_composition(
+    warehouse, tmp_path
+):
+    warehouse.execute(  # exercício informado pelo Senado, sem candidatura: entrou no cargo em 2024
+        "INSERT INTO marts.app_cargo_ocupantes VALUES (NULL, 8000, 'Zé do Senado', 'Senador', 'Rio de Janeiro', 'Partido Z',"
+        " 2024, DATE '2024-05-01', 'informado', DATE '2027-01-31', 'informado', NULL, 'https://exemplo.leg.br/senado',"
+        " DATE '2026-10-24')"
+    )
+    saida = site(warehouse, tmp_path)
+    rj = texto(saida, "estado/RJ.html")
+    hoje = rj[rj.index('class="visao visao-hoje"') : rj.index('class="visao visao-posse"')]
+    assert "Zé do Senado" in hoje and "no cargo desde 2024" in hoje
+    ficha = texto(saida, "pessoa/ze-do-senado-2024-rj-p8000.html")
+    assert (
+        "Mandato atual" in ficha and "A campanha de" not in ficha and "mandato informado pelo Senado" in ficha
+    )
+    assert "Zé do Senado" in texto(saida, "pessoas.html")

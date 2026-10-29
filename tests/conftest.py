@@ -28,8 +28,9 @@ TABELAS = (
     """CREATE TABLE marts.app_pessoas (
         id_pessoa bigint, nome varchar, nome_civil varchar, dt_nascimento date, municipio_nascimento varchar,
         uf_nascimento varchar, profissoes varchar, site_url varchar, rede_social_url varchar, foto_url varchar,
-        fontes varchar, fonte_url varchar, dt_captura date
+        foto_caminho varchar, fontes varchar, fonte_url varchar, dt_captura date
     )""",
+    """CREATE TABLE marts.dim_territorios (tipo varchar, nome varchar, sigla varchar)""",
     """CREATE TABLE marts.dim_eleicoes (id_eleicao varchar, ano_eleicao integer)""",
     """CREATE TABLE marts.dim_cargos (id_cargo varchar, nome varchar)""",
     """CREATE TABLE marts.dim_disputas (id_eleicao varchar, id_cargo varchar, ue varchar, qtd_vagas integer)""",
@@ -187,13 +188,19 @@ def warehouse(tmp_path) -> Iterator[duckdb.DuckDBPyConnection]:
         "INSERT INTO marts.app_pessoas VALUES (10, 'Ana Exemplo', 'Ana Maria Exemplo da Silva', DATE '1975-03-09',"
         " 'Niterói', 'RJ', 'Advogada; professora', 'https://exemplo.gov.br/ana', 'javascript:alert(1),"
         " https://www.instagram.com/ana.exemplo/?hl=pt&igsh=abcdefghijklmnopqrstuvwxyz0123456789,"
-        "https://twitter.com/anaexemplo', 'https://exemplo.gov.br/foto10.jpg', 'camara',"
+        "https://twitter.com/anaexemplo', 'https://exemplo.gov.br/foto10.jpg', NULL, 'camara',"
         " 'https://dadosabertos.camara.leg.br/arquivos/deputados/csv/deputados.csv', ?),"
-        " (12, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'camara', NULL, NULL),"
-        " (14, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'senado', NULL, NULL),"
-        " (500, 'Bruno Modelo', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,"
+        " (12, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'camara', NULL, NULL),"
+        " (14, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'senado', NULL, NULL),"
+        " (500, 'Bruno Modelo', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,"
         " 'https://cdn.tse.jus.br/estatistica/sead/odsele/consulta_cand/consulta_cand_2026.zip', ?)",
         (CAPTURA, CAPTURA),
     )
+    for tipo, nome, sigla in (
+        ("pais", "Brasil", "BR"),
+        ("uf", "Rio de Janeiro", "RJ"),
+        ("uf", "São Paulo", "SP"),
+    ):
+        con.execute("INSERT INTO marts.dim_territorios VALUES (?, ?, ?)", (tipo, nome, sigla))
     yield con
     con.close()

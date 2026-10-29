@@ -38,17 +38,24 @@ def ultimo_ano(con: Connection) -> int:
 
 
 _SELECT = """
-SELECT b.id_candidatura, CAST(split_part(b.id_candidatura, ':', 1) AS INTEGER) AS ano_eleicao,
-       split_part(b.id_candidatura, ':', 2) AS uf, r.turno, b.cargo, c.nome_urna, b.nome, b.partido,
+SELECT coalesce(b.id_candidatura,
+                CAST(b.ano_inicio AS VARCHAR) || ':' || coalesce(t.sigla, '--') || ':p' || CAST(b.id_pessoa AS VARCHAR)
+       ) AS id_candidatura,
+       b.id_candidatura IS NULL AS sem_eleicao,
+       coalesce(CAST(split_part(b.id_candidatura, ':', 1) AS INTEGER), b.ano_inicio) AS ano_eleicao,
+       coalesce(split_part(b.id_candidatura, ':', 2), t.sigla) AS uf, r.turno, b.cargo,
+       coalesce(c.nome_urna, b.nome) AS nome_urna, b.nome, b.partido,
        r.qtd_votos_nominais AS qtd_votos, r.percentual_votos_validos, b.id_pessoa, b.tipo_mandato,
        b.ano_inicio, b.dt_inicio, b.dt_fim_prevista, b.fonte_url, b.dt_captura,
        k.valor_bens, k.valor_receitas, k.valor_despesas, k.fonte_url_bens, k.fonte_url_receitas,
        k.fonte_url_despesas, k.dt_captura_campanha,
        p.foto_url, p.nome_civil, p.dt_nascimento, p.municipio_nascimento, p.uf_nascimento, p.profissoes,
        p.site_url, p.rede_social_url, p.fontes AS fonte_cadastro, p.fonte_url AS fonte_cadastro_url,
-       p.dt_captura AS dt_captura_cadastro, c.ocupacao, c.foto_caminho
+       p.dt_captura AS dt_captura_cadastro, c.ocupacao, coalesce(c.foto_caminho, p.foto_caminho) AS foto_caminho
 FROM marts.app_cargo_ocupantes b
-JOIN marts.fct_candidaturas c ON c.id_candidatura = b.id_candidatura
+LEFT JOIN marts.fct_candidaturas c ON c.id_candidatura = b.id_candidatura
+LEFT JOIN (SELECT DISTINCT nome, sigla FROM marts.dim_territorios WHERE tipo IN ('uf', 'pais')) t
+       ON t.nome = b.territorio
 LEFT JOIN (
     SELECT id_candidatura, turno, qtd_votos_nominais, percentual_votos_validos FROM marts.fct_resultados
     QUALIFY row_number() OVER (PARTITION BY id_candidatura ORDER BY turno DESC) = 1
@@ -59,18 +66,22 @@ LEFT JOIN marts.app_pessoas p ON p.id_pessoa = b.id_pessoa
 
 
 def _ocupantes(con: Connection, onde: str, args: tuple[object, ...]) -> list[Row]:
+    """Quem ocupa ou ocupará os cargos. Quem está no cargo sem eleição própria (a base só informa o exercício) vem
+    com `sem_eleicao`; se a mesma pessoa tem as duas linhas no mesmo cargo, vale a da eleição."""
     marcadores = ", ".join("?" for _ in CARGOS)
     return rows(
         con,
         _SELECT + f" WHERE b.cargo IN ({marcadores}) AND {onde} "
-        "ORDER BY uf, b.cargo, c.nome_urna, b.id_candidatura",
+        "QUALIFY row_number() OVER (PARTITION BY b.id_pessoa, b.cargo, b.ano_inicio "
+        "ORDER BY b.id_candidatura IS NULL, b.dt_inicio DESC) = 1 "
+        "ORDER BY uf, b.cargo, nome_urna, id_candidatura",
         (*CARGOS, *args),
     )
 
 
 def eleitos(con: Connection, ano: int) -> list[Row]:
     """Eleitos das eleições gerais do ano, com o total da campanha e a foto. Ordem alfabética."""
-    return _ocupantes(con, "b.ano_inicio = ?", (ano + 1,))
+    return _ocupantes(con, "b.ano_inicio = ? AND b.id_candidatura IS NOT NULL", (ano + 1,))
 
 
 def ocupantes(con: Connection, em: date) -> list[Row]:
