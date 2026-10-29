@@ -17,7 +17,6 @@ Connection = duckdb.DuckDBPyConnection
 EXECUTIVO = ("Presidente", "Governador")
 LEGISLATIVO = ("Senador", "Deputado federal", "Deputado estadual", "Deputado distrital")
 CARGOS = (*EXECUTIVO, *LEGISLATIVO)
-FONTE_TSE = "https://dadosabertos.tse.jus.br/dataset/candidatos-{ano}"
 
 
 def rows(con: Connection, sql: str, args: tuple[object, ...] = ()) -> list[Row]:
@@ -38,65 +37,45 @@ def ultimo_ano(con: Connection) -> int:
     return int(found[0])
 
 
-def captura_do_tse(con: Connection, ano: int) -> date | None:
-    """Quando os dados da eleição foram capturados do TSE (a captura mais recente dos bens declarados do ano)."""
-    found = con.execute(
-        "SELECT max(dt_captura) FROM marts.fct_candidaturas_bens WHERE ano_eleicao = ?", (ano,)
-    ).fetchone()
-    return found[0] if found else None
-
-
 _SELECT = """
 SELECT b.id_candidatura, CAST(split_part(b.id_candidatura, ':', 1) AS INTEGER) AS ano_eleicao,
        split_part(b.id_candidatura, ':', 2) AS uf, r.turno, b.cargo, c.nome_urna, b.nome, b.partido,
-       r.qtd_votos_nominais AS qtd_votos, r.percentual_votos_validos, b.id_pessoa, b.dt_inicio, b.dt_fim_prevista,
-       k.valor_bens, k.valor_receitas, k.valor_despesas,
+       r.qtd_votos_nominais AS qtd_votos, r.percentual_votos_validos, b.id_pessoa, b.tipo_mandato,
+       b.ano_inicio, b.dt_inicio, b.dt_fim_prevista, b.fonte_url, b.dt_captura,
+       k.valor_bens, k.valor_receitas, k.valor_despesas, k.fonte_url_bens, k.fonte_url_receitas,
+       k.fonte_url_despesas, k.dt_captura_campanha,
        p.foto_url, p.nome_civil, p.dt_nascimento, p.municipio_nascimento, p.uf_nascimento, p.profissoes,
-       p.site_url, p.rede_social_url, p.fontes AS fonte_cadastro, p.dt_captura AS dt_captura_cadastro,
-       c.ocupacao, c.foto_caminho
-FROM {base} b
+       p.site_url, p.rede_social_url, p.fontes AS fonte_cadastro, p.fonte_url AS fonte_cadastro_url,
+       p.dt_captura AS dt_captura_cadastro, c.ocupacao, c.foto_caminho
+FROM marts.app_cargo_ocupantes b
 JOIN marts.fct_candidaturas c ON c.id_candidatura = b.id_candidatura
 LEFT JOIN (
     SELECT id_candidatura, turno, qtd_votos_nominais, percentual_votos_validos FROM marts.fct_resultados
     QUALIFY row_number() OVER (PARTITION BY id_candidatura ORDER BY turno DESC) = 1
 ) r ON r.id_candidatura = b.id_candidatura
-LEFT JOIN marts.fct_campanhas k ON k.id_candidatura = b.id_candidatura
+LEFT JOIN marts.app_pessoa_campanhas k ON k.id_candidatura = b.id_candidatura
 LEFT JOIN marts.app_pessoas p ON p.id_pessoa = b.id_pessoa
 """
-# Quem ocupa o cargo (com datas) ou quem ganhou a eleição, mesmo sem data de posse na base (hoje, os deputados estaduais).
-_OCUPA = "marts.app_cargo_ocupantes"
-_GANHOU = """(
-    SELECT pc.id_candidatura, pc.id_pessoa, c0.nome, pc.cargo, pc.partido, o.dt_inicio, o.dt_fim_prevista
-    FROM marts.app_pessoa_campanhas pc
-    JOIN marts.fct_candidaturas c0 ON c0.id_candidatura = pc.id_candidatura
-    LEFT JOIN marts.app_cargo_ocupantes o ON o.id_candidatura = pc.id_candidatura
-    WHERE pc.fl_eleito
-)"""
 
 
-def _ocupantes(con: Connection, base: str, onde: str, args: tuple[object, ...]) -> list[Row]:
+def _ocupantes(con: Connection, onde: str, args: tuple[object, ...]) -> list[Row]:
     marcadores = ", ".join("?" for _ in CARGOS)
-    linhas = rows(
+    return rows(
         con,
-        _SELECT.format(base=base) + f" WHERE b.cargo IN ({marcadores}) AND {onde} "
+        _SELECT + f" WHERE b.cargo IN ({marcadores}) AND {onde} "
         "ORDER BY uf, b.cargo, c.nome_urna, b.id_candidatura",
         (*CARGOS, *args),
     )
-    capturas = {a: captura_do_tse(con, a) for a in {r["ano_eleicao"] for r in linhas}}
-    for r in linhas:
-        r["fonte_url"] = FONTE_TSE.format(ano=r["ano_eleicao"])
-        r["dt_captura"] = capturas[r["ano_eleicao"]]
-    return linhas
 
 
 def eleitos(con: Connection, ano: int) -> list[Row]:
     """Eleitos das eleições gerais do ano, com o total da campanha e a foto. Ordem alfabética."""
-    return _ocupantes(con, _GANHOU, "split_part(b.id_candidatura, ':', 1) = ?", (str(ano),))
+    return _ocupantes(con, "b.ano_inicio = ?", (ano + 1,))
 
 
 def ocupantes(con: Connection, em: date) -> list[Row]:
     """Quem ocupa cada cargo das eleições gerais na data `em`, segundo a base (início e fim do mandato)."""
-    return _ocupantes(con, _OCUPA, "b.dt_inicio <= ? AND b.dt_fim_prevista >= ?", (em, em))
+    return _ocupantes(con, "b.dt_inicio <= ? AND b.dt_fim_prevista >= ?", (em, em))
 
 
 def data_da_posse(con: Connection, hoje: date) -> date | None:
@@ -136,7 +115,7 @@ def situacao_dos_cargos(con: Connection, ano: int) -> list[Row]:
     linhas = rows(
         con,
         "SELECT d.ue AS uf, g.nome AS cargo, d.qtd_vagas, "
-        "count(o.id_candidatura) AS qtd_eleitos "
+        "count(o.id_candidatura) AS qtd_eleitos, max(o.dt_captura) AS dt_captura "
         "FROM marts.dim_disputas d "
         "JOIN marts.dim_eleicoes e ON e.id_eleicao = d.id_eleicao "
         "JOIN marts.dim_cargos g ON g.id_cargo = d.id_cargo "
@@ -147,10 +126,8 @@ def situacao_dos_cargos(con: Connection, ano: int) -> list[Row]:
         "GROUP BY d.ue, g.nome, d.qtd_vagas ORDER BY d.ue, g.nome",
         (ano, *CARGOS),
     )
-    captura = captura_do_tse(con, ano)
     for r in linhas:
         r["qtd_pendentes"] = max(int(r["qtd_vagas"]) - int(r["qtd_eleitos"]), 0)
-        r["dt_captura"] = captura
     return linhas
 
 
@@ -172,8 +149,9 @@ def ocupacoes_das_pessoas(con: Connection, ids: list[int]) -> dict[int, list[Row
     """Todos os mandatos de cada pessoa na base (qualquer cargo), do mais recente para o mais antigo."""
     linhas = rows(
         con,
-        "SELECT id_pessoa, id_candidatura, cargo, territorio, partido, dt_inicio, dt_fim_prevista, base_do_inicio "
-        "FROM marts.app_cargo_ocupantes WHERE list_contains(?, id_pessoa) ORDER BY dt_inicio DESC",
+        "SELECT id_pessoa, id_candidatura, cargo, territorio, partido, ano_inicio, dt_inicio, dt_fim_prevista, "
+        "base_do_inicio, tipo_mandato "
+        "FROM marts.app_cargo_ocupantes WHERE list_contains(?, id_pessoa) ORDER BY ano_inicio DESC, dt_inicio DESC",
         (ids,),
     )
     por_pessoa: dict[int, list[Row]] = {}

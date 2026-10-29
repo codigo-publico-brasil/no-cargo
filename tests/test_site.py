@@ -192,8 +192,7 @@ def test_names_are_escaped_and_pages_load_nothing_from_other_sites(warehouse, tm
         assert all(
             u in permitidos
             or u.startswith((REPO, seo.SITE))
-            or "dadosabertos.tse.jus.br" in u
-            or "exemplo.gov.br" in u
+            or u.split("/")[2].endswith((".jus.br", ".leg.br", ".gov.br"))  # fontes oficiais: só links
             for u in externos
         ), caminho
     for arquivo in (saida / "style.css", saida / "tokens.css"):
@@ -317,7 +316,7 @@ def test_the_person_block_has_the_six_facts_and_short_links(warehouse, tmp_path)
     assert "Quem é</h2>" not in ana and "Na eleição de" not in ana and "No cadastro" not in ana
     bruno = texto(saida, "pessoa/*-2026-rj-2.html")  # sem ligação ao cadastro
     assert (
-        "Fonte: TSE, capturado em 24/10/2026" in bruno
+        ">TSE</a>, capturado em 24/10/2026" in bruno
         and '<dt>Nascimento</dt><dd class="vazio num">Sem dado</dd>' in bruno
     )
 
@@ -500,11 +499,11 @@ def test_who_has_no_register_uses_the_tse_profession_and_birth_state(warehouse, 
         "<dt>Profissões</dt><dd>Engenheiro</dd>" in bruno
         and '<dt>Naturalidade</dt><dd class="vazio">Sem dado</dd>' in bruno
     )
-    assert "Fonte: TSE, capturado em 24/10/2026" in bruno
+    assert ">TSE</a>, capturado em 24/10/2026" in bruno
     ana = texto(saida, "pessoa/ana-exemplo-2026-rj-1.html")  # com cadastro: nada vem do TSE além da eleição
     assert (
         "Advogada, professora" in ana
-        and "Fonte: cadastro da Câmara dos Deputados" in ana
+        and ">cadastro da Câmara dos Deputados</a>, capturado em 24/10/2026" in ana
         and "estado de nascimento" not in ana
     )
 
@@ -626,3 +625,30 @@ def test_the_in_office_filter_includes_whoever_was_reelected(warehouse, tmp_path
     assert 'data-grupo="atual"' in gil
     bruno = pagina[pagina.index('href="pessoa/bruno-modelo-2026-rj-2.html"') :].split(">", 1)[0]
     assert 'data-grupo="novo"' in bruno  # o mandato dele terminou em 2022
+
+
+def test_the_campaign_note_links_to_the_sources_and_says_when_they_were_captured(warehouse, tmp_path):
+    ana = texto(site(warehouse, tmp_path), "pessoa/ana-exemplo-2026-rj-1.html")
+    assert 'href="https://exemplo.gov.br/bens.zip">bens declarados</a>' in ana
+    assert (
+        'href="https://exemplo.gov.br/contas.zip">prestação de contas</a> ao TSE, capturado em 24/10/2026'
+        in ana
+    )
+
+
+def test_the_badges_of_the_mandate_type_come_from_the_base(warehouse, tmp_path):
+    saida = site(warehouse, tmp_path)
+    estado = texto(saida, "estado/RJ.html")
+    assert (
+        'data-tipo="novato"' in estado
+        and 'data-tipo="reeleito"' in estado
+        and 'data-tipo="retorno"' in estado
+    )
+    assert "Novatos (" in estado and "Reeleitos (" in estado and "Retorno (" in estado
+    assert "Reeleito" in texto(saida, "pessoa/ana-exemplo-2026-rj-1.html")
+
+
+def test_a_mandate_without_a_start_date_shows_only_the_year_and_says_so(warehouse, tmp_path):
+    elisa = texto(site(warehouse, tmp_path), "pessoa/elisa-ficticia-2026-sp-6.html")
+    assert "a partir de 2027" in elisa and "Data de posse: sem dado." in elisa
+    assert "<progress" not in elisa.split("Próximo mandato")[1].split("</li>")[0]

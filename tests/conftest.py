@@ -14,22 +14,21 @@ TABELAS = (
     """CREATE TABLE marts.fct_resultados (
         id_candidatura varchar, turno integer, qtd_votos_nominais bigint, percentual_votos_validos decimal(5, 2)
     )""",
-    """CREATE TABLE marts.fct_campanhas (
-        id_candidatura varchar, valor_bens decimal(18, 2), valor_receitas decimal(18, 2), valor_despesas decimal(18, 2)
-    )""",
-    """CREATE TABLE marts.fct_candidaturas_bens (ano_eleicao integer, dt_captura date)""",
     """CREATE TABLE marts.app_cargo_ocupantes (
         id_candidatura varchar, id_pessoa bigint, nome varchar, cargo varchar, territorio varchar, partido varchar,
-        dt_inicio date, base_do_inicio varchar, dt_fim_prevista date, base_eleicao varchar
+        ano_inicio integer, dt_inicio date, base_do_inicio varchar, dt_fim_prevista date, base_eleicao varchar,
+        tipo_mandato varchar, fonte_url varchar, dt_captura date
     )""",
     """CREATE TABLE marts.app_pessoa_campanhas (
         id_candidatura varchar, id_pessoa bigint, ano_eleicao integer, cargo varchar, partido varchar,
-        resultado varchar, fl_eleito boolean
+        resultado varchar, fl_eleito boolean, valor_bens decimal(18, 2), valor_receitas decimal(18, 2),
+        valor_despesas decimal(18, 2), fonte_url_bens varchar, fonte_url_receitas varchar,
+        fonte_url_despesas varchar, dt_captura_campanha date
     )""",
     """CREATE TABLE marts.app_pessoas (
         id_pessoa bigint, nome varchar, nome_civil varchar, dt_nascimento date, municipio_nascimento varchar,
         uf_nascimento varchar, profissoes varchar, site_url varchar, rede_social_url varchar, foto_url varchar,
-        fontes varchar, dt_captura date
+        fontes varchar, fonte_url varchar, dt_captura date
     )""",
     """CREATE TABLE marts.dim_eleicoes (id_eleicao varchar, ano_eleicao integer)""",
     """CREATE TABLE marts.dim_cargos (id_cargo varchar, nome varchar)""",
@@ -47,16 +46,16 @@ CARGOS_DA_BASE = (
     ("deputado_distrital", "Deputado distrital"),
 )
 
-# id, uf, cargo, nome de urna, partido, votos, id_pessoa
+# id, uf, cargo, nome de urna, partido, votos, id_pessoa, tipo_mandato
 PESSOAS_ELEITAS = [
-    ("2026:RJ:1", "RJ", "Deputado federal", "Ana Exemplo", "Partido A", 142300, 10),
-    ("2026:RJ:2", "RJ", "Deputado federal", "Bruno Modelo", "Partido B", 98100, 500),
-    ("2026:RJ:8", "RJ", "Deputado federal", "Nina Nova", "Partido B", 50500, 14),
-    ("2026:RJ:3", "RJ", "Deputado federal", "<b>Carla</b> Teste", "Partido C", 201500, 12),
-    ("2026:RJ:4", "RJ", "Senador", "Paulo Exemplo", "Partido B", 3100000, 600),
-    ("2026:RJ:5", "RJ", "Governador", "Diego Amostra", "Partido A", 2400000, 700),
-    ("2026:SP:6", "SP", "Deputado estadual", "Elisa Ficticia", "Partido D", 70500, 77),
-    ("2026:DF:7", "DF", "Deputado distrital", "Fábio Exemplo", "Partido E", 12000, 800),
+    ("2026:RJ:1", "RJ", "Deputado federal", "Ana Exemplo", "Partido A", 142300, 10, "reeleito"),
+    ("2026:RJ:2", "RJ", "Deputado federal", "Bruno Modelo", "Partido B", 98100, 500, None),
+    ("2026:RJ:8", "RJ", "Deputado federal", "Nina Nova", "Partido B", 50500, 14, "novato"),
+    ("2026:RJ:3", "RJ", "Deputado federal", "<b>Carla</b> Teste", "Partido C", 201500, 12, "retorno"),
+    ("2026:RJ:4", "RJ", "Senador", "Paulo Exemplo", "Partido B", 3100000, 600, "novato"),
+    ("2026:RJ:5", "RJ", "Governador", "Diego Amostra", "Partido A", 2400000, 700, None),
+    ("2026:SP:6", "SP", "Deputado estadual", "Elisa Ficticia", "Partido D", 70500, 77, None),
+    ("2026:DF:7", "DF", "Deputado distrital", "Fábio Exemplo", "Partido E", 12000, 800, None),
 ]
 
 
@@ -72,6 +71,7 @@ def inserir(
     votos: int = 1000,
     percentual: float = 10.5,
     com_mandato: bool = True,
+    tipo: str | None = None,
 ) -> None:
     """Uma candidatura. Se eleita, ganha resultado, mandato na base (do ano seguinte por 4 anos, 8 para senador)
     e, sem data de posse, o que a base ainda não sabe (`com_mandato=False`: deputado estadual de 2026)."""
@@ -83,18 +83,19 @@ def inserir(
         (id_candidatura, urna, urna, partido, pessoa, foto, eleito),
     )
     con.execute(
-        "INSERT INTO marts.app_pessoa_campanhas VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO marts.app_pessoa_campanhas VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, NULL, NULL)",
         (id_candidatura, pessoa, ano, cargo, partido, resultado, eleito),
     )
     if eleito:
         con.execute(
             "INSERT INTO marts.fct_resultados VALUES (?, 1, ?, ?)", (id_candidatura, votos, percentual)
         )
-    if eleito and com_mandato:
+    if eleito:
         anos = 8 if cargo == "Senador" else 4
+        inicio, fim = (date(ano + 1, 1, 1), date(ano + anos, 12, 31)) if com_mandato else (None, None)
         con.execute(
-            "INSERT INTO marts.app_cargo_ocupantes VALUES (?, ?, ?, ?, ?, ?, ?, 'derivado', ?, 'informado')",
-            (id_candidatura, pessoa, urna, cargo, uf, partido, date(ano + 1, 1, 1), date(ano + anos, 12, 31)),
+            "INSERT INTO marts.app_cargo_ocupantes VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'derivado', ?, 'informado', ?, ?, ?)",
+            (id_candidatura, pessoa, urna, cargo, uf, partido, ano + 1, inicio, fim, tipo, URL, CAPTURA),
         )
 
 
@@ -112,12 +113,19 @@ def warehouse(tmp_path) -> Iterator[duckdb.DuckDBPyConnection]:
     for id_cargo, nome in CARGOS_DA_BASE:
         con.execute("INSERT INTO marts.dim_cargos VALUES (?, ?)", (id_cargo, nome))
     con.execute("INSERT INTO marts.dim_eleicoes VALUES ('2026-1', 2026)")
-    for ano in (2014, 2018, 2022, 2026):
-        con.execute("INSERT INTO marts.fct_candidaturas_bens VALUES (?, ?)", (ano, CAPTURA))
-    for id_, uf, cargo, urna, partido, votos, pessoa in PESSOAS_ELEITAS:
+    for id_, uf, cargo, urna, partido, votos, pessoa, tipo in PESSOAS_ELEITAS:
         # os deputados estaduais e distritais de 2026 ainda não têm data de posse na base
         inserir(
-            con, id_, uf, cargo, urna, partido, pessoa, votos=votos, com_mandato="Deputado e" not in cargo
+            con,
+            id_,
+            uf,
+            cargo,
+            urna,
+            partido,
+            pessoa,
+            votos=votos,
+            com_mandato="Deputado e" not in cargo,
+            tipo=tipo,
         )
     # Bruno não tem cadastro: a profissão vem do TSE
     con.execute(
@@ -155,11 +163,16 @@ def warehouse(tmp_path) -> Iterator[duckdb.DuckDBPyConnection]:
         ("2014:RJ:BRUNO", 2014, "Vereador", "Partido B", 500, "Suplente"),
     ):
         con.execute(
-            "INSERT INTO marts.app_pessoa_campanhas VALUES (?, ?, ?, ?, ?, ?, false)",
+            "INSERT INTO marts.app_pessoa_campanhas VALUES (?, ?, ?, ?, ?, ?, false, NULL, NULL, NULL, NULL, NULL, NULL, NULL)",
             (id_, pessoa, ano, cargo, partido, resultado),
         )
     # só a primeira pessoa tem total de campanha; as demais ficam sem dado (vazio, não zero)
-    con.execute("INSERT INTO marts.fct_campanhas VALUES ('2026:RJ:1', 1200000, 2400000, 2300000)")
+    con.execute(
+        "UPDATE marts.app_pessoa_campanhas SET valor_bens = 1200000, valor_receitas = 2400000, valor_despesas = 2300000,"
+        " fonte_url_bens = 'https://exemplo.gov.br/bens.zip', fonte_url_receitas = 'https://exemplo.gov.br/contas.zip',"
+        " fonte_url_despesas = 'https://exemplo.gov.br/contas.zip', dt_captura_campanha = DATE '2026-10-24'"
+        " WHERE id_candidatura = '2026:RJ:1'"
+    )
     # vagas por cargo e estado, para saber quem falta
     for id_cargo, uf, vagas in (
         ("deputado_federal", "RJ", 3),
@@ -174,10 +187,13 @@ def warehouse(tmp_path) -> Iterator[duckdb.DuckDBPyConnection]:
         "INSERT INTO marts.app_pessoas VALUES (10, 'Ana Exemplo', 'Ana Maria Exemplo da Silva', DATE '1975-03-09',"
         " 'Niterói', 'RJ', 'Advogada; professora', 'https://exemplo.gov.br/ana', 'javascript:alert(1),"
         " https://www.instagram.com/ana.exemplo/?hl=pt&igsh=abcdefghijklmnopqrstuvwxyz0123456789,"
-        "https://twitter.com/anaexemplo', 'https://exemplo.gov.br/foto10.jpg', 'camara', ?),"
-        " (12, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'camara', NULL),"
-        " (14, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'senado', NULL)",
-        (CAPTURA,),
+        "https://twitter.com/anaexemplo', 'https://exemplo.gov.br/foto10.jpg', 'camara',"
+        " 'https://dadosabertos.camara.leg.br/arquivos/deputados/csv/deputados.csv', ?),"
+        " (12, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'camara', NULL, NULL),"
+        " (14, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'senado', NULL, NULL),"
+        " (500, 'Bruno Modelo', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,"
+        " 'https://cdn.tse.jus.br/estatistica/sead/odsele/consulta_cand/consulta_cand_2026.zip', ?)",
+        (CAPTURA, CAPTURA),
     )
     yield con
     con.close()
