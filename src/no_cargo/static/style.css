@@ -134,13 +134,14 @@ main{max-width:var(--larg);margin:0 auto;padding:0 var(--gut)}
 .heroi .grade{margin-top:6px;padding-top:16px;border-top:1px solid var(--line)}
 .heroi .grade+.nota{margin:4px 0 0;font-size:14px;color:var(--muted)}
 .card .grade+.nota{margin-top:12px}
+.grade.duas{grid-template-columns:1fr}
 @media (min-width:600px){.grade{grid-template-columns:repeat(3,1fr)}.grade.duas{grid-template-columns:1fr 1fr}}
 .lista-linhas{gap:0;margin-top:10px;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
 .pessoa.linha{padding:10px 16px;gap:12px;border-top:1px solid var(--line)}
 .pessoa.linha:first-child{border-top:0}
 .pessoa.linha:hover{background:var(--leve)}
 @media (min-width:760px){.controles .filtros{flex-wrap:wrap;overflow:visible}}
-.grade.duas>div{display:grid;grid-row:span 2;grid-template-rows:subgrid;row-gap:0}
+@media (min-width:600px){.grade.duas>div{display:grid;grid-row:span 2;grid-template-rows:subgrid;row-gap:0}}
 .obra-flutuante{position:fixed;right:16px;bottom:16px;z-index:5;max-width:calc(100vw - 32px)}
 .obra-flutuante>summary{display:flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:999px;background:var(--yellow);color:#1a1500;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;list-style:none;box-shadow:0 4px 14px rgba(0,0,0,.2)}
 .obra-flutuante>summary::-webkit-details-marker{display:none}
@@ -148,3 +149,5 @@ main{max-width:var(--larg);margin:0 auto;padding:0 var(--gut)}
 .obra-flutuante p{margin:0 0 8px}.obra-flutuante p:last-child{margin:0}
 @media print{.obra-flutuante{display:none}}
 
+
+.card.presidente{display:flex;gap:16px;align-items:center}.card.presidente h3{margin:0}.card.presidente .foto{flex:none}
