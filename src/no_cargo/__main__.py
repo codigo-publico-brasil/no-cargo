@@ -39,13 +39,10 @@ def trazer_fotos(pessoas: list[dados.Row], origem: Path | None, saida: Path) -> 
         return 0
     trazidas = 0
     for r in pessoas:
-        pasta = origem / str(r["ano_eleicao"]) / str(r["uf"])
-        sequencial = str(r["id_candidatura"]).rsplit(":", 1)[-1]
-        arquivo = next(
-            (a for a in (pasta / f"{sequencial}.jpg", pasta / f"{sequencial}.jpeg") if a.is_file()), None
-        )
+        caminho = r.get("foto_caminho")
+        arquivo = origem / str(caminho) if caminho and (origem / str(caminho)).is_file() else None
         if arquivo:
-            destino = Path("fotos") / str(r["ano_eleicao"]) / str(r["uf"]) / arquivo.name
+            destino = Path("fotos") / str(caminho)
             (saida / destino).parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(arquivo, saida / destino)
             r["foto_local"] = destino.as_posix()
@@ -65,7 +62,7 @@ def construir(
     hoje = hoje or agora.date()
     ano = dados.ultimo_ano(con)
     eleitos = dados.eleitos(con, ano)
-    atuais = dados.em_exercicio(con, ano, hoje, eleitos)
+    atuais = dados.em_exercicio(con, hoje, eleitos)
     situacao = dados.situacao_dos_cargos(con, ano)
     capturado = max((r["dt_captura"] for r in situacao if r["dt_captura"]), default=None)
     saida.mkdir(parents=True, exist_ok=True)
@@ -88,18 +85,23 @@ def construir(
         escrever(saida / "estado" / f"{uf}.html", paginas.estado(uf, ano, eleitos, situacao, capturado))
         escritas.append(f"estado/{uf}.html")
         total += 1
-    for r in [*eleitos, *atuais]:
-        mandatos = dados.mandatos(con, r["id_pessoa"]) if r["id_pessoa"] else []
-        candidaturas = dados.candidaturas(con, r["id_pessoa"]) if r["id_pessoa"] else []
-        vistas = {(c["ano_eleicao"], c["cargo"]) for c in candidaturas}
-        candidaturas += [
-            h
-            for h in dados.historico(con, r["id_candidatura"])
-            if (h["ano_eleicao"], h["cargo"]) not in vistas
-        ]
-        desde = dados.ininterrupto_desde(mandatos, hoje)
+    pessoas = [*eleitos, *atuais]
+    ids = [r["id_pessoa"] for r in pessoas if r["id_pessoa"]]
+    ocupacoes_de = dados.ocupacoes_das_pessoas(con, ids)
+    candidaturas_de = dados.candidaturas_das_pessoas(con, ids)
+    for r in pessoas:
+        ocupacoes = ocupacoes_de.get(r["id_pessoa"], [])
+        candidaturas = candidaturas_de.get(r["id_pessoa"], [])
+        desde = dados.ininterrupto_desde(
+            [
+                {"dt_inicio": o["dt_inicio"], "dt_fim": o["dt_fim_prevista"]}
+                for o in ocupacoes
+                if o["dt_inicio"] and o["dt_inicio"] <= hoje
+            ],
+            hoje,
+        )
         arquivo = arquivo_da_ficha(r["nome_urna"], r["id_candidatura"])
-        escrever(saida / "pessoa" / arquivo, paginas.ficha(r, hoje, mandatos, candidaturas, desde))
+        escrever(saida / "pessoa" / arquivo, paginas.ficha(r, hoje, ocupacoes, candidaturas, desde))
         escritas.append(f"pessoa/{arquivo}")
         total += 1
     quantas = Counter(r["cargo"] for r in eleitos)
