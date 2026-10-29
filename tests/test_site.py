@@ -591,3 +591,15 @@ def test_the_home_shows_the_elected_president_with_photo_party_and_votes(warehou
 def test_a_person_page_does_not_carry_the_provisional_label(warehouse, tmp_path):
     pagina = texto(site(warehouse, tmp_path), "pessoa/ana-exemplo-2026-rj-1.html")
     assert "Próximo mandato" in pagina and "provisório" not in pagina.lower()
+
+
+def test_a_person_elected_again_shows_the_term_still_running_from_the_tse_instead_of_just_elected_before(
+    warehouse, tmp_path
+):
+    warehouse.execute(  # Diego (governador 2026) foi eleito governador em 2022: mandato de 2023 a 2026
+        "INSERT INTO marts.eleitos_historico VALUES ('2026:RJ:5', 2022, 1, 'RJ', 'Governador', 'Partido A',"
+        " 'Eleito', DATE '2026-10-24')"
+    )
+    pagina = texto(site(warehouse, tmp_path), "pessoa/diego-amostra-2026-rj-5.html")
+    assert "No cargo desde 2023" in pagina and "Mandato de 2023 a 2026" in pagina
+    assert "Já foi eleito antes" not in pagina

@@ -746,11 +746,30 @@ def ficha(
         )
     itens += [item for _, item in sorted(passado, key=lambda x: -x[0])]
     ja_eleito = any(str(c["resultado"] or "").lower().startswith("eleito") for c in candidaturas_da_pessoa)
+    em_curso_tse = (
+        next(  # eleito antes para este cargo, com o mandato previsto ainda valendo hoje: (início, fim)
+            (
+                (c["ano_eleicao"] + 1, c["ano_eleicao"] + anos)
+                for c in candidaturas_da_pessoa
+                if c["cargo"] == cargo
+                and c["ano_eleicao"] < r["ano_eleicao"]
+                and str(c["resultado"] or "").lower().startswith("eleito")
+                and c["ano_eleicao"] + 1 <= hoje.year <= c["ano_eleicao"] + anos
+            ),
+            None,
+        )
+    )
     if atual:
         sem_tempo = "Mandato em curso"
         sem_tempo_nota = "Previsto pelo resultado do TSE; o resultado não registra afastamentos nem suplentes que assumiram."
     elif r["tipo_mandato"] == "novato":  # pessoa ligada, sem mandato anterior na casa
         sem_tempo, sem_tempo_nota = "Ainda não tomou posse", f"A posse é em {inicio}."
+    elif em_curso_tse:
+        sem_tempo = f"No cargo desde {em_curso_tse[0]}"
+        sem_tempo_nota = (
+            f"Mandato de {em_curso_tse[0]} a {em_curso_tse[1]}, previsto pelo resultado do TSE, que não registra "
+            "afastamentos. Mandatos anteriores podem não aparecer."
+        )
     elif ja_eleito:
         sem_tempo = "Já foi eleito antes"
         sem_tempo_nota = "Pelas eleições do TSE, ligadas por nome e data de nascimento. O resultado da eleição não registra afastamentos."
