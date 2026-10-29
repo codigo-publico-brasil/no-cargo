@@ -541,6 +541,8 @@ def test_photos_of_the_year_are_copied_and_served_from_the_site_itself(warehouse
     origem = tmp_path / "fotos"
     (origem / "2026" / "RJ").mkdir(parents=True)
     (origem / "2026" / "RJ" / "1.jpg").write_bytes(b"\xff\xd8jpeg")  # Ana, 2026:RJ:1
+    (origem / "2022" / "RJ").mkdir(parents=True)
+    (origem / "2022" / "RJ" / "201.jpeg").write_bytes(b"22")  # Gil Anterior, em mandato (eleito em 2022)
     saida = tmp_path / "dist"
     construir(warehouse, saida, HOJE, fotos=origem)
     assert (saida / "fotos" / "2026" / "RJ" / "1.jpg").read_bytes() == b"\xff\xd8jpeg"
@@ -551,7 +553,14 @@ def test_photos_of_the_year_are_copied_and_served_from_the_site_itself(warehouse
     assert 'src="../fotos/2026/RJ/1.jpg"' in texto(saida, "estado/RJ.html")
     bruno = texto(saida, "pessoa/bruno-modelo-2026-rj-2.html")  # sem arquivo: segue o desenho de reserva
     assert "Sem foto" in bruno and "Foto: TSE" not in bruno
-    assert len(list((saida / "fotos").rglob("*.jpg"))) == 1
+    assert len(list((saida / "fotos").rglob("*.jp*g"))) == 2
+    gil = texto(
+        saida, "pessoa/gil-anterior-2022-rj-201.html"
+    )  # quem está em mandato usa a foto do ano da eleição
+    assert 'src="../fotos/2022/RJ/201.jpeg"' in gil and "Foto: TSE" in gil
+    assert "Sem foto" in texto(
+        saida, "pessoa/sena-antiga-2018-rj-203.html"
+    )  # sem arquivo de 2018: desenho de reserva
 
 
 def test_without_a_photos_folder_nothing_is_copied_and_the_page_keeps_the_register_photo(warehouse, tmp_path):

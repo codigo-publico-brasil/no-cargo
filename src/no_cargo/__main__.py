@@ -32,16 +32,20 @@ def escrever(caminho: Path, texto: str) -> None:
     caminho.write_text(texto, encoding="utf-8")
 
 
-def trazer_fotos(eleitos: list[dados.Row], ano: int, origem: Path | None, saida: Path) -> int:
-    """Copia para o site a foto oficial (TSE) de cada eleito do ano e marca a linha com o caminho: as fotos
-    são servidas pelo próprio site, nunca de outro domínio. Quem não tem arquivo segue sem `foto_local`."""
+def trazer_fotos(pessoas: list[dados.Row], origem: Path | None, saida: Path) -> int:
+    """Copia para o site a foto oficial (TSE) de cada pessoa, do ano da eleição dela, e marca a linha com o
+    caminho: as fotos são servidas pelo próprio site, nunca de outro domínio. Sem arquivo, sem foto local."""
     if origem is None:
         return 0
     trazidas = 0
-    for r in eleitos:
-        arquivo = origem / str(ano) / str(r["uf"]) / f"{str(r['id_candidatura']).rsplit(':', 1)[-1]}.jpg"
-        if arquivo.is_file():
-            destino = Path("fotos") / str(ano) / str(r["uf"]) / arquivo.name
+    for r in pessoas:
+        pasta = origem / str(r["ano_eleicao"]) / str(r["uf"])
+        sequencial = str(r["id_candidatura"]).rsplit(":", 1)[-1]
+        arquivo = next(
+            (a for a in (pasta / f"{sequencial}.jpg", pasta / f"{sequencial}.jpeg") if a.is_file()), None
+        )
+        if arquivo:
+            destino = Path("fotos") / str(r["ano_eleicao"]) / str(r["uf"]) / arquivo.name
             (saida / destino).parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(arquivo, saida / destino)
             r["foto_local"] = destino.as_posix()
@@ -59,7 +63,7 @@ def construir(con: dados.Connection, saida: Path, hoje: date | None = None, foto
     capturado = max((r["dt_captura"] for r in situacao if r["dt_captura"]), default=None)
     saida.mkdir(parents=True, exist_ok=True)
     shutil.copytree(ESTATICOS, saida, dirs_exist_ok=True)  # css, js, símbolo e fontes (arquivos binários)
-    trazer_fotos(eleitos, ano, fotos, saida)
+    trazer_fotos([*eleitos, *atuais], fotos, saida)
     escritas: list[str] = ["index.html", "pessoas.html", "cargos.html", "como-calculamos.html"]
     escrever(saida / "index.html", paginas.brasil(ano, eleitos, situacao, capturado))
     escrever(saida / "pessoas.html", paginas.pessoas(ano, eleitos, capturado, atuais))
