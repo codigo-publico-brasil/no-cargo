@@ -703,3 +703,17 @@ def test_links_to_other_sites_open_in_a_new_tab_and_internal_ones_do_not(warehou
         else:
             assert "target=" not in tag, tag
     assert 'href="https://www.instagram.com/' in ana
+
+
+def test_a_mandate_without_an_election_still_shows_up_and_does_not_repeat_one_that_has(warehouse, tmp_path):
+    warehouse.execute(  # exercício da Câmara de Ana em 2019 a 2022, igual ao mandato que a eleição de 2018 deu
+        "INSERT INTO marts.app_cargo_ocupantes VALUES (NULL, 10, 'Ana Exemplo', 'Deputado federal', 'RJ', 'Partido A',"
+        " 2019, DATE '2019-02-01', 'informado', DATE '2022-12-31', 'informado', NULL, NULL, DATE '2026-10-24')"
+    )
+    warehouse.execute(  # e um mandato mais antigo, só com a Câmara como fonte
+        "INSERT INTO marts.app_cargo_ocupantes VALUES (NULL, 10, 'Ana Exemplo', 'Deputado federal', 'RJ', 'Partido A',"
+        " 2003, DATE '2003-02-01', 'informado', DATE '2007-01-31', 'informado', NULL, NULL, DATE '2026-10-24')"
+    )
+    pagina = texto(site(warehouse, tmp_path), "pessoa/ana-exemplo-2026-rj-1.html")
+    assert pagina.count("Mandato de 2019 a 2022") == 1
+    assert "Mandato de 2003 a 2007" in pagina
