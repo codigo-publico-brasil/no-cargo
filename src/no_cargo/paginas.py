@@ -60,6 +60,32 @@ FONTES = (
 )
 
 
+# A base informa o arquivo de cada fonte (um .csv ou .zip que baixa sozinho). O link do site leva à página do
+# conjunto de dados, que explica o dado; o endereço do arquivo fica no `title`.
+PAGINAS_DAS_FONTES = (
+    (r"cdn\.tse\.jus\.br/.*(?:consulta_cand|bem_candidato)_(\d{4})", "https://dadosabertos.tse.jus.br/dataset/candidatos-{}"),
+    (r"cdn\.tse\.jus\.br/.*prestacao.*?(\d{4})", "https://dadosabertos.tse.jus.br/dataset/prestacao-de-contas-eleitorais-{}"),
+    (r"dadosabertos\.camara\.leg\.br/arquivos/", "https://dadosabertos.camara.leg.br/"),
+    (r"legis\.senado\.leg\.br/dadosabertos/", "https://www12.senado.leg.br/dados-abertos"),
+)  # fmt: skip
+
+
+def pagina_da_fonte(url: str) -> str:
+    """Do arquivo da fonte para a página do conjunto de dados; sem regra conhecida, o próprio endereço."""
+    for padrao, pagina_ in PAGINAS_DAS_FONTES:
+        achou = re.search(padrao, url)
+        if achou:
+            return pagina_.format(*achou.groups())
+    return url
+
+
+def link_da_fonte(url: object, texto: str) -> str:
+    """O link de uma fonte oficial: abre a página do conjunto de dados; o arquivo vai no `title`."""
+    if not url:
+        return e(texto)
+    return f'<a href="{e(pagina_da_fonte(str(url)))}" title="Arquivo: {e(url)}">{e(texto)}</a>'
+
+
 def _links_externos_em_nova_guia(html: str) -> str:
     """Todo link para fora do site (fontes oficiais, redes e sites dos eleitos, repositório) abre em outra guia."""
 
@@ -777,19 +803,12 @@ def _nome_da_fonte(r: Row) -> str:
 def fontes_da_campanha(r: Row) -> str:
     """De onde vêm os totais da campanha: os bens declarados e a prestação de contas, cada um com seu endereço."""
 
-    def link(url: object, texto: str) -> str:
-        return f'<a href="{e(url)}">{texto}</a>' if url else texto
-
     capturado = f", capturado em {data_curta(r['dt_captura_campanha'])}" if r["dt_captura_campanha"] else ""
     return (
-        f"Fonte: {link(r['fonte_url_bens'], 'bens declarados')} e "
-        f"{link(r['fonte_url_receitas'], 'prestação de contas')} ao TSE{capturado}. "
+        f"Fonte: {link_da_fonte(r['fonte_url_bens'], 'bens declarados')} e "
+        f"{link_da_fonte(r['fonte_url_receitas'], 'prestação de contas')} ao TSE{capturado}. "
         "Sem dado quando não entregue, nunca zero."
     )
-
-
-def _link(url: object, texto: str) -> str:
-    return f'<a href="{e(url)}">{e(texto)}</a>' if url else e(texto)
 
 
 def sobre_a_pessoa(r: Row) -> str:
@@ -816,14 +835,14 @@ def sobre_a_pessoa(r: Row) -> str:
         capturado = (
             f", capturado em {data_curta(r['dt_captura_cadastro'])}" if r["dt_captura_cadastro"] else ""
         )
-        fonte = f"Fonte: {_link(r['fonte_cadastro_url'], 'cadastro da ' + casa)}{capturado}."
+        fonte = f"Fonte: {link_da_fonte(r['fonte_cadastro_url'], 'cadastro da ' + casa)}{capturado}."
         if profissao_tse:
             fonte += f" Profissão: TSE, capturado em {data_curta(r['dt_captura'])}."
     else:
         capturado = (
             f", capturado em {data_curta(r['dt_captura_cadastro'])}" if r["dt_captura_cadastro"] else ""
         )
-        fonte = f"Fonte: {_link(r['fonte_cadastro_url'], 'TSE')}{capturado}."
+        fonte = f"Fonte: {link_da_fonte(r['fonte_cadastro_url'], 'TSE')}{capturado}."
     return grade(linhas, largos=("Nome completo",), numeros=("Nascimento",)) + f'<p class="nota">{fonte}</p>'
 
 
@@ -961,7 +980,7 @@ def ficha(
         if r.get("sem_eleicao")
         else f'<h2>A campanha de {r["ano_eleicao"]}</h2><div class="card">{campanha}</div>'
         f'<p class="nota">{fontes_da_campanha(r)}</p>',
-        f'<p class="nota">Fonte: <a href="{e(r["fonte_url"])}">{_nome_da_fonte(r)}</a>, capturado em {data_curta(r["dt_captura"])}. '
+        f'<p class="nota">Fonte: {link_da_fonte(r["fonte_url"], _nome_da_fonte(r))}, capturado em {data_curta(r["dt_captura"])}. '
         + ("Foto: TSE. " if r.get("foto_local") else "")
         + f'<a href="../como-calculamos.html">Como calculamos</a>. '
         f'<a href="{seo.link_de_correcao(r["nome_urna"] + ", " + cargo, caminho)}">Encontrou um erro?</a></p>',
