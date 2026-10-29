@@ -7,7 +7,7 @@ from pathlib import Path
 from no_cargo import cores, dados, formato, seo
 from no_cargo.__main__ import construir
 from no_cargo.cores import SEM_COR
-from no_cargo.paginas import FONTES, REPO, SITE_MAE, sem_acento
+from no_cargo.paginas import FONTES, REPO, SITE_MAE, pagina_da_fonte, sem_acento
 
 HOJE = date(2026, 10, 25)
 
@@ -637,12 +637,22 @@ def test_the_in_office_filter_includes_whoever_was_reelected(warehouse, tmp_path
 
 def test_the_campaign_note_links_to_the_sources_and_says_when_they_were_captured(warehouse, tmp_path):
     ana = texto(site(warehouse, tmp_path), "pessoa/ana-exemplo-2026-rj-1.html")
-    assert (
-        'href="https://exemplo.gov.br/bens.zip" target="_blank" rel="noopener noreferrer">bens declarados</a>'
-        in ana
-    )
-    assert 'target="_blank" rel="noopener noreferrer">prestação de contas</a>' in ana
+    assert 'title="Arquivo: https://exemplo.gov.br/bens.zip"' in ana  # fonte desconhecida: o próprio endereço
+    assert ">bens declarados</a>" in ana and ">prestação de contas</a>" in ana
     assert "ao TSE, capturado em 24/10/2026" in ana
+
+
+def test_a_source_link_opens_the_dataset_page_not_the_file_to_download(warehouse, tmp_path):
+    bruno = texto(site(warehouse, tmp_path), "pessoa/bruno-modelo-2026-rj-2.html")
+    assert 'href="https://dadosabertos.tse.jus.br/dataset/candidatos-2026"' in bruno
+    assert (
+        'title="Arquivo: https://cdn.tse.jus.br/estatistica/sead/odsele/consulta_cand/consulta_cand_2026.zip"'
+        in bruno
+    )
+    assert 'href="https://cdn.tse.jus.br' not in bruno and '.zip"' not in re.sub(r'title="[^"]*"', "", bruno)
+    assert pagina_da_fonte("https://dadosabertos.camara.leg.br/arquivos/deputados/csv/deputados.csv") == (
+        "https://dadosabertos.camara.leg.br/"
+    )
 
 
 def test_the_badges_of_the_mandate_type_come_from_the_base(warehouse, tmp_path):
