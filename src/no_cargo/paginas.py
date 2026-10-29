@@ -352,7 +352,7 @@ def linha_de_pessoa(r: Row, em_mandato: bool = False) -> str:
     nome_uf = nome_do_local(r["uf"])
     return (
         f'<a class="pessoa linha" href="pessoa/{arquivo_da_ficha(r["nome_urna"], r["id_candidatura"])}" data-nome="{e(sem_acento(str(r["nome_urna"])))}" '
-        f'data-partido="{e(sem_acento(str(r["partido"])))}" data-cargo="{e(r["cargo"])}" data-uf="{e(r["uf"])}" data-grupo="{"atual" if r.get("em_exercicio") else "novo atual" if em_mandato else "novo"}" '
+        f'data-partido="{e(sem_acento(str(r["partido"])))}" data-cargo="{e(r["cargo"])}" data-uf="{e(r["uf"])}" data-tipo="{e(r["tipo_mandato"] or "sem")}" data-grupo="{"atual" if r.get("em_exercicio") else "novo atual" if em_mandato else "novo"}" '
         f'data-local="{e(sem_acento(f"{r['cargo']} {r['uf']} {nome_uf}"))}"><span class="dados"><b>{e(r["nome_urna"])}</b>'
         f"<span>{e(r['cargo'])} &middot; {e(r['uf'] if r['uf'] != 'BR' else 'Brasil')} &middot; {e(r['partido'])} &middot; eleito em {r['ano_eleicao']}</span></span>"
         '<i aria-hidden="true">&#8250;</i></a>'
@@ -383,6 +383,9 @@ def pessoas(
         f'<button type="button" data-grupo="novo" aria-pressed="false">Eleitos em {ano}</button>'
         '<button type="button" data-grupo="atual" aria-pressed="false">Em mandato</button></div>'
         '<div class="selecoes"><label>Cargo<select id="filtro-cargo">' + opcoes_cargo + "</select></label>"
+        '<label>Tipo de mandato<select id="filtro-tipo"><option value="">Todos</option>'
+        + opcoes_de_tipo(todos)
+        + "</select></label>"
         '<label>Ordenar por<select id="filtro-ordem"><option value="nome">Nome</option>'
         '<option value="uf">Estado</option><option value="partido">Partido</option></select></label></div>'
         '<p class="contagem" aria-live="polite"></p></div>'

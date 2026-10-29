@@ -652,3 +652,16 @@ def test_a_mandate_without_a_start_date_shows_only_the_year_and_says_so(warehous
     elisa = texto(site(warehouse, tmp_path), "pessoa/elisa-ficticia-2026-sp-6.html")
     assert "a partir de 2027" in elisa and "Data de posse: sem dado." in elisa
     assert "<progress" not in elisa.split("Próximo mandato")[1].split("</li>")[0]
+
+
+def test_the_people_page_filters_by_novato_reeleito_and_retorno(warehouse, tmp_path):
+    pagina = texto(site(warehouse, tmp_path), "pessoas.html")
+    assert (
+        'id="filtro-tipo"' in pagina
+        and "Novatos (" in pagina
+        and "Reeleitos (" in pagina
+        and "Retorno (" in pagina
+    )
+    ana = pagina[pagina.index('href="pessoa/ana-exemplo-2026-rj-1.html"') :].split(">", 1)[0]
+    assert 'data-tipo="reeleito"' in ana
+    assert 'data-tipo="retorno"' in pagina
