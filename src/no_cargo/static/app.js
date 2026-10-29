@@ -51,6 +51,29 @@
     aplicar();
   });
 
+  // Busca de estado pelo nome ou pela sigla; sem JavaScript o campo fica escondido e a grade inteira aparece.
+  var estados = document.getElementById("estados");
+  var campoEstado = document.getElementById("busca-estado");
+  if (estados && campoEstado) {
+    campoEstado.parentNode.hidden = false;
+    var avisoEstado = campoEstado.parentNode.querySelector(".contagem");
+    campoEstado.addEventListener("input", function () {
+      var termo = norm(campoEstado.value.trim());
+      var visiveis = 0;
+      estados.querySelectorAll(".estados").forEach(function (lista) {
+        var algum = false;
+        lista.querySelectorAll("li").forEach(function (li) {
+          var ok = !termo || li.dataset.nome.indexOf(termo) >= 0;
+          li.hidden = !ok;
+          if (ok) { algum = true; visiveis += 1; }
+        });
+        lista.hidden = !algum;
+        lista.previousElementSibling.hidden = !algum;
+      });
+      avisoEstado.textContent = visiveis === 0 ? "Nenhum estado encontrado. Tente outro nome ou a sigla." : "";
+    });
+  }
+
   // Passar o mouse (ou focar) em um partido da legenda destaca as cadeiras dele no hemiciclo.
   document.querySelectorAll(".hemiciclo").forEach(function (h) {
     function destacar(g) {

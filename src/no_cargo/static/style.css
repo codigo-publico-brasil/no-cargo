@@ -171,3 +171,5 @@ main{max-width:var(--larg);margin:0 auto;padding:0 var(--gut)}
 .atalhos a{display:flex;flex-direction:column;gap:2px;color:var(--ink);text-decoration:none;min-height:60px;justify-content:center}
 .atalhos a:hover{border-color:var(--green-ink)}.atalhos b{font-size:18px}.atalhos span{color:var(--muted);font-size:15px}
 @media (min-width:600px){.atalhos{grid-template-columns:1fr 1fr}}
+.busca-estado input{width:100%;min-height:52px;padding:0 16px;font:inherit;font-size:18px;border:1px solid var(--borda);border-radius:12px;background:var(--surface);color:var(--ink)}
+.busca-estado[hidden],.estados li[hidden],.estados[hidden],.regiao[hidden]{display:none}

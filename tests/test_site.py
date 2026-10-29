@@ -494,8 +494,8 @@ def test_the_menu_starts_with_inicio_and_marks_it_on_the_home(warehouse, tmp_pat
     for caminho, marcado in (("index.html", True), ("pessoas.html", False), ("estado/RJ.html", False)):
         pagina = texto(saida, caminho)
         topo = pagina[pagina.index('<nav class="nav"') : pagina.index("</nav>")]
-        assert topo.index(">Início<") < topo.index(">Pessoas<"), caminho
-        assert ('aria-current="page">Início</a>' in topo) is marcado, caminho
+        assert topo.index(">Brasil<") < topo.index(">Estados<") < topo.index(">Pessoas<"), caminho
+        assert ('aria-current="page">Brasil</a>' in topo) is marcado, caminho
 
 
 def test_the_national_office_has_no_fake_state_in_the_breadcrumb_header_or_list(warehouse, tmp_path):
@@ -612,7 +612,15 @@ def test_the_timeline_shows_the_party_of_each_past_election(warehouse, tmp_path)
 def test_the_states_have_their_own_page_and_the_home_only_links_to_it(warehouse, tmp_path):
     saida = site(warehouse, tmp_path)
     estados = texto(saida, "estados.html")
-    assert estados.count('href="estado/') == 27 and "Nordeste" in estados and "busca-estado" not in estados
+    assert estados.count('href="estado/') == 27 and "Nordeste" in estados
     inicio = texto(saida, "index.html")
     assert 'href="estados.html"' in inicio and inicio.count('href="estado/') == 0
+    assert "busca-estado" not in inicio
     assert ">Estados</a>" in inicio[inicio.index('<nav class="nav"') : inicio.index("</nav>")]
+
+
+def test_the_states_page_has_a_search_box_that_only_shows_with_javascript(warehouse, tmp_path):
+    saida = site(warehouse, tmp_path)
+    estados = texto(saida, "estados.html")
+    assert 'id="busca-estado"' in estados and 'class="busca-estado" hidden' in estados
+    assert 'data-nome="sao paulo sp"' in estados and "busca-estado" in texto(saida, "app.js")

@@ -45,9 +45,9 @@ PODERES = (
 )  # fmt: skip
 
 NAV = (
-    ("inicio", "Início", "index.html"),
-    ("pessoas", "Pessoas", "pessoas.html"),
+    ("inicio", "Brasil", "index.html"),
     ("estados", "Estados", "estados.html"),
+    ("pessoas", "Pessoas", "pessoas.html"),
     ("cargos", "Cargos", "cargos.html"),
     ("como", "Origens", "como-calculamos.html"),
 )
@@ -96,7 +96,7 @@ def pagina(
         '<footer class="rodape"><div><b>No Cargo</b>'
         f'<p>Um projeto do <a href="{SITE_MAE}">Código Público Brasil</a>. Código sob AGPL-3.0; dados curados sob CC BY 4.0.</p>'
         f"<p>Dados oficiais: {fontes}.</p>"
-        f'<p class="links"><a href="{raiz}index.html">Início</a><a href="{raiz}cargos.html">Entenda os cargos</a><a href="{raiz}como-calculamos.html">Como calculamos e de onde vêm os dados</a>'
+        f'<p class="links"><a href="{raiz}index.html">Brasil</a><a href="{raiz}cargos.html">Entenda os cargos</a><a href="{raiz}como-calculamos.html">Como calculamos e de onde vêm os dados</a>'
         f'<a href="{correcao}">Encontrou um erro? Abra uma issue &#8599;</a><a href="{REPO}">Código no GitHub &#8599;</a></p></div></footer>\n'
         + tag_em_construcao(raiz, correcao)
         + f'<script src="{raiz}app.js" defer></script>\n</body>\n</html>\n'
@@ -108,7 +108,7 @@ def nao_encontrada() -> str:
     corpo = (
         '<section class="heroi"><span class="sobretitulo">404</span><h1>Esta página não existe</h1>'
         "<p>O endereço pode ter mudado. Procure a pessoa pelo nome ou volte ao início.</p></section>"
-        '<div class="secao"><p><a href="/pessoas.html">Todas as pessoas eleitas</a> &middot; <a href="/">Início</a> &middot; '
+        '<div class="secao"><p><a href="/pessoas.html">Todas as pessoas eleitas</a> &middot; <a href="/">Brasil</a> &middot; '
         '<a href="/como-calculamos.html">Como calculamos</a></p></div>'
     )
     html = pagina("Página não encontrada", corpo, "", raiz="/")
@@ -405,12 +405,17 @@ def estados(capturado: date | None) -> str:
     blocos = "".join(
         f'<h2 class="regiao">{regiao}</h2><ul class="estados">'
         + "".join(
-            f'<li><a href="estado/{uf}.html"><b>{uf}</b><span>{e(nome)}</span></a></li>'
+            f'<li data-nome="{e(sem_acento(nome))} {uf.lower()}"><a href="estado/{uf}.html"><b>{uf}</b><span>{e(nome)}</span></a></li>'
             for uf, (nome, reg) in sorted(UFS.items(), key=lambda kv: kv[1][0])
             if reg == regiao
         )
         + "</ul>"
         for regiao in regioes
+    )
+    busca = (
+        '<div class="busca-estado" hidden><label class="so-leitor" for="busca-estado">Buscar estado</label>'
+        '<input id="busca-estado" type="search" placeholder="Digite o nome ou a sigla do estado" autocomplete="off">'
+        '<p class="contagem" aria-live="polite"></p></div>'
     )
     corpo = [
         faixa_de_titulo(
@@ -419,7 +424,7 @@ def estados(capturado: date | None) -> str:
             "Quem foi eleito em cada estado e no Distrito Federal, pelos três poderes.",
             aviso_provisorio(capturado),
         ),
-        f'<div class="secao">{blocos}</div>',
+        f'<div class="secao" id="estados">{busca}{blocos}</div>',
     ]
     return pagina(
         "Estados",
