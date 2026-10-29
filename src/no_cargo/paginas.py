@@ -398,13 +398,18 @@ def nome_do_local(uf: str) -> str:
     return "Brasil" if uf == "BR" else UFS.get(uf, (uf,))[0]
 
 
+def _de_onde_veio(r: Row) -> str:
+    """`eleito em 2022` ou, para quem está no cargo sem eleição própria, `no cargo desde 2024`."""
+    return f"no cargo desde {r['ano_inicio']}" if r.get("sem_eleicao") else f"eleito em {r['ano_eleicao']}"
+
+
 def linha_de_pessoa(r: Row, em_mandato: bool = False) -> str:
     nome_uf = nome_do_local(r["uf"])
     return (
         f'<a class="pessoa linha" href="pessoa/{arquivo_da_ficha(r["nome_urna"], r["id_candidatura"])}" data-nome="{e(sem_acento(str(r["nome_urna"])))}" '
         f'data-partido="{e(sem_acento(str(r["partido"])))}" data-cargo="{e(r["cargo"])}" data-uf="{e(r["uf"])}" data-tipo="{e(r["tipo_mandato"] or "sem")}" data-grupo="{"atual" if r.get("em_exercicio") else "novo atual" if em_mandato else "novo"}" '
         f'data-local="{e(sem_acento(f"{r['cargo']} {r['uf']} {nome_uf}"))}"><span class="dados"><b>{e(r["nome_urna"])}</b>'
-        f"<span>{e(r['cargo'])} &middot; {e(r['uf'] if r['uf'] != 'BR' else 'Brasil')} &middot; {e(r['partido'])} &middot; eleito em {r['ano_eleicao']}</span></span>"
+        f"<span>{e(r['cargo'])} &middot; {e(r['uf'] if r['uf'] != 'BR' else 'Brasil')} &middot; {e(r['partido'])} &middot; {_de_onde_veio(r)}</span></span>"
         '<i aria-hidden="true">&#8250;</i></a>'
     )
 
@@ -518,8 +523,11 @@ def legenda_dos_selos() -> str:
 
 
 def cartao_de_pessoa(r: Row) -> str:
-    detalhe = f"{e(r['partido'])} &middot; {numero(r['qtd_votos'])} votos" + (
-        "" if r.get("novo") else f" &middot; eleito em {r['ano_eleicao']}"
+    detalhe = (
+        f"{e(r['partido'])} &middot; {_de_onde_veio(r)}"
+        if r.get("sem_eleicao")
+        else f"{e(r['partido'])} &middot; {numero(r['qtd_votos'])} votos"
+        + ("" if r.get("novo") else f" &middot; eleito em {r['ano_eleicao']}")
     )
     return (
         f'<a class="card pessoa" href="../pessoa/{r.get("ficha") or arquivo_da_ficha(r["nome_urna"], r["id_candidatura"])}" data-nome="{e(str(r["nome_urna"]).lower())}" '
@@ -758,6 +766,14 @@ def grade(
     )
 
 
+def _nome_da_fonte(r: Row) -> str:
+    return (
+        "mandato informado pelo Senado ou pela Câmara"
+        if r.get("sem_eleicao")
+        else f"TSE, candidaturas {r['ano_eleicao']}"
+    )
+
+
 def fontes_da_campanha(r: Row) -> str:
     """De onde vêm os totais da campanha: os bens declarados e a prestação de contas, cada um com seu endereço."""
 
@@ -941,9 +957,11 @@ def ficha(
         aviso_novato,
         f'<h2>Tempo no cargo e mandatos</h2><div class="card">{tempo_no_cargo}{linha_do_tempo(itens)}'
         '<p class="nota">Datas dos mandatos previstas pela base a partir da eleição, sem registro de afastamentos.</p></div>',
-        f'<h2>A campanha de {r["ano_eleicao"]}</h2><div class="card">{campanha}</div>'
+        ""
+        if r.get("sem_eleicao")
+        else f'<h2>A campanha de {r["ano_eleicao"]}</h2><div class="card">{campanha}</div>'
         f'<p class="nota">{fontes_da_campanha(r)}</p>',
-        f'<p class="nota">Fonte: <a href="{e(r["fonte_url"])}">TSE, candidaturas {r["ano_eleicao"]}</a>, capturado em {data_curta(r["dt_captura"])}. '
+        f'<p class="nota">Fonte: <a href="{e(r["fonte_url"])}">{_nome_da_fonte(r)}</a>, capturado em {data_curta(r["dt_captura"])}. '
         + ("Foto: TSE. " if r.get("foto_local") else "")
         + f'<a href="../como-calculamos.html">Como calculamos</a>. '
         f'<a href="{seo.link_de_correcao(r["nome_urna"] + ", " + cargo, caminho)}">Encontrou um erro?</a></p>',
