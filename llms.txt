@@ -1,8 +1,8 @@
 # No Cargo
 
-> No Cargo mostra quem ocupa o poder no Brasil, pelos três poderes (Executivo, Legislativo e Judiciário) e pelas esferas federal, estadual e municipal, com a fonte oficial e a data de captura ao lado de cada dado. Hoje cobre as 1647 pessoas eleitas nas eleições gerais de 2026 (1035 deputado estadual, 513 deputado federal, 54 senador, 21 governador, 24 deputado distrital). Prefeitos, vereadores e o Judiciário estão em construção.
+> No Cargo mostra quem ocupa o poder no Brasil, pelos três poderes (Executivo, Legislativo e Judiciário) e pelas esferas federal, estadual e municipal, com a fonte oficial e a data de captura ao lado de cada dado. Hoje cobre as 1654 pessoas eleitas nas eleições gerais de 2026 (1035 deputado estadual, 513 deputado federal, 27 governador, 54 senador, 1 presidente, 24 deputado distrital). Prefeitos, vereadores e o Judiciário estão em construção.
 
-Dados atualizados em 25/10/2026. O resultado de 2026 é provisório até a diplomação. Não há ranking, nota nem recomendação de voto; todas as pessoas seguem o mesmo modelo de página.
+Dados atualizados em 29/10/2026. O resultado de 2026 é provisório até a diplomação. Não há ranking, nota nem recomendação de voto; todas as pessoas seguem o mesmo modelo de página.
 
 ## Onde está cada coisa
 - [Início](https://nocargo.codigopublicobrasil.com.br/): composição de cada casa por partido (Câmara, Senado, Assembleias, governos).
