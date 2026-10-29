@@ -567,3 +567,27 @@ def test_without_a_photos_folder_nothing_is_copied_and_the_page_keeps_the_regist
     saida = site(warehouse, tmp_path)
     assert not (saida / "fotos").exists()
     assert "foto10.jpg" in texto(saida, "pessoa/ana-exemplo-2026-rj-1.html")
+
+
+def test_the_home_shows_the_elected_president_with_photo_party_and_votes(warehouse, tmp_path):
+    warehouse.execute(
+        "INSERT INTO marts.eleitos (id_candidatura, ano_eleicao, uf, ue, cargo, nome_urna, nome, partido, qtd_votos,"
+        " percentual_votos_nominais, id_pessoa, tipo_mandato, dt_captura, fonte_url, id_pessoa_tse)"
+        " VALUES ('2026:BR:9', 2026, 'BR', 'BR', 'Presidente', 'Pres Novo', 'Pres Novo', 'Partido K', 64256232, 51.8,"
+        " NULL, NULL, DATE '2026-10-24', 'https://dadosabertos.tse.jus.br/dataset/candidatos-2026', 904)"
+    )
+    fotos = tmp_path / "origem" / "2026" / "BR"
+    fotos.mkdir(parents=True)
+    (fotos / "9.jpg").write_bytes(b"jpg")
+    saida = tmp_path / "dist"
+    construir(warehouse, saida, hoje=date(2026, 10, 29), fotos=tmp_path / "origem")
+    inicio = texto(saida, "index.html")
+    card = inicio[inicio.index('class="card presidente"') :]
+    card = card[: card.index("</div></div>")]
+    assert 'src="fotos/2026/BR/9.jpg"' in card and "Partido K" in card and "64.256.232 votos" in card
+    assert 'href="pessoa/pres-novo-2026-br-9.html"' in card
+
+
+def test_a_person_page_does_not_carry_the_provisional_label(warehouse, tmp_path):
+    pagina = texto(site(warehouse, tmp_path), "pessoa/ana-exemplo-2026-rj-1.html")
+    assert "Próximo mandato" in pagina and "provisório" not in pagina.lower()

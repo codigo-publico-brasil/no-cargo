@@ -221,13 +221,24 @@ def contar(eleitos: list[Row], cargos: tuple[str, ...]) -> Counter[str]:
     return Counter(r["partido"] or "Sem partido" for r in eleitos if r["cargo"] in cargos)
 
 
+def _card_do_presidente(r: Row) -> str:
+    """Foto, partido e votos de quem foi eleito presidente, com link para a ficha."""
+    return (
+        '<div class="card presidente">'
+        + foto(r["foto_url"], r["nome_urna"], 88, r.get("foto_local"))
+        + f"<div><h3>Presidente da República</h3><p><b>{e(r['nome_urna'])}</b>, {e(r['partido'])}.</p>"
+        f"<p>{numero(r['qtd_votos'])} votos, {percentual(r['percentual_votos_nominais'])} dos válidos. "
+        f"Eleito em {r['ano_eleicao']}.</p>"
+        f'<p><a href="pessoa/{arquivo_da_ficha(r["nome_urna"], r["id_candidatura"])}">Ver a ficha completa</a></p></div></div>'
+    )
+
+
 def brasil(ano: int, eleitos: list[Row], situacao: list[Row], capturado: date | None) -> str:
     governos = [s for s in situacao if s["cargo"] == "Governador"]
     pend = sum(int(s["qtd_pendentes"]) for s in governos)
     presidente = [r for r in eleitos if r["cargo"] == "Presidente"]
     pres_card = (
-        f'<div class="card"><h3>Presidente da República</h3><p><a href="pessoa/{arquivo_da_ficha(presidente[0]["nome_urna"], presidente[0]["id_candidatura"])}">'
-        f"{e(presidente[0]['nome_urna'])}</a>, {e(presidente[0]['partido'])}.</p></div>"
+        _card_do_presidente(presidente[0])
         if presidente
         else '<div class="card aguardando"><h3>Presidente da República</h3><p>Aguardando o resultado do 2º turno. '
         "Quando o TSE divulgar, o eleito aparece aqui.</p></div>"
@@ -683,7 +694,7 @@ def ficha(
                 "proximo",
                 "Próximo mandato",
                 f"De {inicio} a {inicio + anos - 1}, {anos} anos",
-                f"Eleito em {r['ano_eleicao']}, resultado provisório. Os mandatos vão do início ao fim do ano.",
+                f"Eleito em {r['ano_eleicao']}. Os mandatos vão do início ao fim do ano.",
             )
         ]
     passado: list[
@@ -796,7 +807,7 @@ def ficha(
         + (
             '<div class="selos"><span class="selo semselo">Mandato em curso</span></div>'
             if atual
-            else f'<div class="selos">{selo(r["tipo_mandato"], cargo)}<span class="selo provisorio">Resultado provisório</span></div>'
+            else f'<div class="selos">{selo(r["tipo_mandato"], cargo)}</div>'
         )
         + f"{sobre_a_pessoa(r)}</section>",
         '<div class="secao">',
