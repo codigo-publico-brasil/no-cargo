@@ -130,9 +130,7 @@ def test_district_deputies_are_shown_with_the_state_ones(warehouse, tmp_path):
 def test_profile_shows_time_in_office_timeline_and_the_campaign_totals(warehouse, tmp_path):
     pagina = texto(site(warehouse, tmp_path), "pessoa/*-2026-rj-1.html")
     assert "7 anos e 8 meses" in pagina  # desde 1º de fev. de 2019 até 25/10/2026, sem interrupção
-    assert (
-        "Próximo mandato" in pagina and "Mandato atual" in pagina and "fev. de 2023 a jan. de 2027" in pagina
-    )
+    assert "Próximo mandato" in pagina and "Mandato atual" in pagina and "2023 a 2027" in pagina
     assert (
         "R$ 1.200.000,00" in pagina
         and "R$ 2.400.000,00" in pagina
@@ -148,12 +146,12 @@ def test_profile_never_shows_a_posse_month_or_empty_dates(warehouse, tmp_path):
         pagina = caminho.read_text(encoding="utf-8")
         assert "sem data" not in pagina, caminho  # mandato sem data não vira linha de "sem data a sem data"
     pagina = texto(saida, "pessoa/*-2026-rj-1.html")
-    assert "De 2027 a 2030, 4 anos" in pagina and "Termina no" not in pagina
+    assert "2027 a 2030" in pagina and "Termina no" not in pagina
     assert (
         "fev. de 2027" not in pagina and "mai. de" not in pagina
     )  # a data exata da posse não vem de fonte confiável
     senador = texto(saida, "pessoa/*-2026-rj-4.html")
-    assert "De 2027 a 2034, 8 anos" in senador
+    assert "2027 a 2034" in senador
 
 
 def test_a_candidacy_with_two_rounds_appears_once_with_the_final_result(warehouse, tmp_path):
@@ -195,13 +193,14 @@ def test_novato_only_appears_for_someone_linked_and_without_a_previous_mandate(w
     assert (
         "Novato" in pagina
         and "Primeiro mandato na Câmara dos Deputados." in pagina
-        and "Ainda não tomou posse" in pagina
+        and "Próximo mandato" in pagina
+        and "começa em" in pagina
     )
 
 
 def test_state_filters_only_list_the_types_that_exist_with_counts_and_a_no_badge_option(warehouse, tmp_path):
     pagina = texto(site(warehouse, tmp_path), "estado/RJ.html")
-    assert "Sem selo (1)" in pagina and "Novatos (1)" in pagina and 'data-tipo="sem"' in pagina
+    assert "Sem selo (1)" in pagina and "Novatos (1)" in pagina and 'value="sem"' in pagina
     assert "Retorno (1)" in pagina and "Reeleitos (1)" in pagina
 
 
@@ -298,7 +297,7 @@ def test_a_win_for_another_office_appears_as_a_mandate_from_the_election_result(
 
 def test_an_elected_without_a_link_shows_the_earlier_elections_found_in_the_tse(warehouse, tmp_path):
     pagina = texto(site(warehouse, tmp_path), "pessoa/*-2026-rj-2.html")  # Bruno
-    assert "Já foi eleito antes" in pagina and "Eleito em 2018" in pagina
+    assert "Eleito em 2018" in pagina and "Pelo Partido B." in pagina
     assert "Deputado federal, mandato previsto de 2019 a 2022" in pagina
     assert "Candidatura em 2014" in pagina and "Vereador, suplente" in pagina
     assert "Histórico de mandatos não confirmado" not in pagina  # há prova no TSE
@@ -375,7 +374,7 @@ def test_the_people_page_lists_everyone_elected_in_alphabetical_order_without_ra
     )  # sem ordem por votos e sem foto (página leve)
     assert 'data-cargo="Senador"' in pagina and ">Pessoas</a>" in texto(saida, "index.html")
     assert 'href="pessoas.html">Veja todas' in texto(saida, "index.html")
-    assert "data-cargo" in texto(saida, "app.js")
+    assert "filtro-cargo" in texto(saida, "app.js")
 
 
 def test_every_page_can_be_found_canonical_description_share_card_and_structured_data(warehouse, tmp_path):
@@ -476,7 +475,7 @@ def test_the_people_page_includes_whoever_is_still_in_office_from_earlier_electi
         pagina.count("<b>Ana Exemplo</b>") == 1 and pagina.count("<b>Elisa Ficticia</b>") == 1
     )  # reeleito conta uma vez
     assert "eleito em 2022" in pagina and 'data-grupo="atual"' in pagina and 'data-grupo="novo"' in pagina
-    assert "Em mandato, eleitos antes (3)" in pagina and "Eleitos em 2026 (8)" in pagina
+    assert ">Em mandato</button>" in pagina and ">Eleitos em 2026</button>" in pagina
 
 
 def test_a_person_still_in_office_gets_a_page_with_the_current_mandate_and_no_provisional_result(
@@ -484,10 +483,10 @@ def test_a_person_still_in_office_gets_a_page_with_the_current_mandate_and_no_pr
 ):
     saida = site(warehouse, tmp_path)
     pagina = texto(saida, "pessoa/gil-anterior-2022-rj-201.html")
-    assert "Mandato em curso" in pagina and "De 2023 a 2026, 4 anos" in pagina and "Mandato atual" in pagina
+    assert "Mandato em curso" in pagina and "2023 a 2026" in pagina and "Mandato atual" in pagina
     assert "Resultado provisório" not in pagina and "Próximo mandato" not in pagina
     senador = texto(saida, "pessoa/sena-antiga-2018-rj-203.html")
-    assert "De 2019 a 2026, 8 anos" in senador
+    assert "2019 a 2026" in senador
 
 
 def test_the_menu_starts_with_inicio_and_marks_it_on_the_home(warehouse, tmp_path):
@@ -513,9 +512,7 @@ def test_the_national_office_has_no_fake_state_in_the_breadcrumb_header_or_list(
         and "Presidente &middot; Brasil" in pagina
         and "presidente do Brasil" in pagina
     )
-    assert (
-        pagina.count("Mandato em curso") == 2
-    )  # a etiqueta e o título do bloco; o período aparece uma vez, no mandato atual
+    assert pagina.count("Mandato em curso") == 1  # a etiqueta; o período aparece na barra do mandato atual
     assert "Presidente &middot; Brasil &middot; Partido J" in texto(saida, "pessoas.html")
 
 
@@ -591,3 +588,28 @@ def test_the_home_shows_the_elected_president_with_photo_party_and_votes(warehou
 def test_a_person_page_does_not_carry_the_provisional_label(warehouse, tmp_path):
     pagina = texto(site(warehouse, tmp_path), "pessoa/ana-exemplo-2026-rj-1.html")
     assert "Próximo mandato" in pagina and "provisório" not in pagina.lower()
+
+
+def test_the_current_mandate_shows_how_much_has_passed_and_the_next_one_starts_empty(warehouse, tmp_path):
+    pagina = texto(site(warehouse, tmp_path), "pessoa/gil-anterior-2022-rj-201.html")
+    # 2023-01-01 a 2026-12-31 e hoje = 25/10/2026: 1.394 de 1.461 dias
+    assert '<progress max="100" value="95"' in pagina and "95% cumprido" in pagina
+    assert "Períodos previstos pelo resultado do TSE" in pagina
+    nova = texto(site(warehouse, tmp_path), "pessoa/*-2026-rj-8.html")
+    assert '<progress max="100" value="0"' in nova and "começa em" in nova
+
+
+def test_the_votes_say_what_the_percentage_refers_to_and_the_round(warehouse, tmp_path):
+    pagina = texto(site(warehouse, tmp_path), "pessoa/*-2026-rj-1.html")
+    assert "10,5% dos votos nominais para deputado federal em Rio de Janeiro, 1º turno" in pagina
+
+
+def test_the_timeline_shows_the_party_of_each_past_election(warehouse, tmp_path):
+    pagina = texto(site(warehouse, tmp_path), "pessoa/*-2026-rj-2.html")  # Bruno
+    assert "Pelo Partido B. Fonte: TSE" in pagina
+
+
+def test_the_home_lists_the_states_as_links_by_region_without_a_search_box(warehouse, tmp_path):
+    inicio = texto(site(warehouse, tmp_path), "index.html")
+    assert inicio.count('href="estado/') >= 27 and "<h3>Nordeste</h3>" in inicio
+    assert "busca-estado" not in inicio
