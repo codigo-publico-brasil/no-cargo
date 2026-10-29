@@ -15,6 +15,7 @@ if [ "$branch" != "main" ] && [ "${1:-}" != "--sem-push" ]; then
 fi
 commit="$(git rev-parse --short HEAD)"
 
+rm -rf dist                                       # sem páginas e fotos de builds anteriores
 uv run no-cargo                                   # escreve dist/ a partir do warehouse
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
