@@ -72,6 +72,36 @@
     });
   }
 
+  // Compartilhar: abre o menu do aparelho (WhatsApp, redes, e-mail) com o endereço canônico da página; sem ele,
+  // copia o link e mostra uma marca de verificação por 2 segundos. Sem JavaScript o botão não aparece.
+  var compartilhar = document.querySelector(".compartilhar");
+  if (compartilhar && (navigator.share || (navigator.clipboard && navigator.clipboard.writeText))) {
+    compartilhar.hidden = false;
+    var aviso = document.querySelector("[data-aviso-link]");
+    var copiar = function (url) {
+      var pronto = function () {
+        compartilhar.classList.add("ok");
+        if (aviso) { aviso.textContent = "Link copiado"; }
+        setTimeout(function () {
+          compartilhar.classList.remove("ok");
+          if (aviso) { aviso.textContent = ""; }
+        }, 2000);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(pronto, function () { window.prompt("Copie o link", url); });
+      } else { window.prompt("Copie o link", url); }
+    };
+    compartilhar.addEventListener("click", function () {
+      var canonico = document.querySelector('link[rel="canonical"]');
+      var url = canonico ? canonico.href : location.href;
+      if (navigator.share) {
+        navigator.share({ title: document.title, url: url }).catch(function (erro) {
+          if (!erro || erro.name !== "AbortError") { copiar(url); }
+        });
+      } else { copiar(url); }
+    });
+  }
+
   // Passar o mouse (ou focar) em um partido da legenda destaca as cadeiras dele no hemiciclo.
   document.querySelectorAll(".hemiciclo").forEach(function (h) {
     function destacar(g) {

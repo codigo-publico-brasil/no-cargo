@@ -128,7 +128,12 @@ def pagina(
         f'<img src="{raiz}no-cargo.svg" alt="" width="32" height="32">'
         '<span class="marca-nome">No Cargo</span></a>'
         f'<nav class="nav" aria-label="Principal">{menu}</nav>'
-        f'<div class="acoes"><a class="gh" href="{REPO}" aria-label="Código do No Cargo no GitHub" title="Código do No Cargo no GitHub">'
+        '<div class="acoes"><button type="button" class="compartilhar" hidden aria-label="Compartilhar esta página"'
+        ' title="Compartilhar"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" '
+        'stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/>'
+        '<circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>'
+        '</svg></button><span class="so-leitor" role="status" data-aviso-link></span>'
+        f'<a class="gh" href="{REPO}" aria-label="Código do No Cargo no GitHub" title="Código do No Cargo no GitHub">'
         f'<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="{ICONE_GITHUB}"/></svg></a></div></div></header>\n<div class="faixa-cores"></div>\n'
         f"<main>\n{corpo}\n</main>\n"
         '<footer class="rodape"><div><b>No Cargo</b>'

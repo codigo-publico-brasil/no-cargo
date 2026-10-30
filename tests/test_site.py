@@ -746,3 +746,30 @@ def test_whoever_is_in_office_without_an_election_of_their_own_still_counts_in_t
         "Mandato atual" in ficha and "A campanha de" not in ficha and "mandato informado pelo Senado" in ficha
     )
     assert "Zé do Senado" in texto(saida, "pessoas.html")
+
+
+def test_every_page_has_a_share_button_that_only_works_with_javascript(warehouse, tmp_path):
+    saida = site(warehouse, tmp_path)
+    for caminho in (
+        "index.html",
+        "estados.html",
+        "estado/RJ.html",
+        "pessoa/ana-exemplo-2026-rj-1.html",
+        "cargos.html",
+    ):
+        pagina = texto(saida, caminho)
+        topo = pagina[pagina.index('<div class="acoes">') : pagina.index("</header>")]
+        assert 'class="compartilhar" hidden' in topo and 'aria-label="Compartilhar esta página"' in topo, (
+            caminho
+        )
+        assert topo.index('class="compartilhar"') < topo.index('class="gh"'), (
+            caminho
+        )  # primeiro, à direita do menu
+        assert 'rel="canonical"' in pagina, caminho  # é o endereço que o botão compartilha
+    js = texto(saida, "app.js")
+    assert (
+        "navigator.share" in js
+        and "clipboard.writeText" in js
+        and "2000" in js
+        and 'link[rel="canonical"]' in js
+    )

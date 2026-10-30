@@ -22,7 +22,7 @@ h2{font-size:24px}h3{font-size:20px}
 .nav a:hover{color:var(--hero-ink);background:#162a21}
 .nav a[aria-current]{color:var(--yellow)}
 .acoes{display:flex;align-items:center;gap:8px;margin-left:8px}
-.gh{flex:none;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid #2c4339;border-radius:999px;color:var(--hero-ink)}
+.gh{flex:none;display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border:1px solid #2c4339;border-radius:999px;color:var(--hero-ink)}
 .gh:hover{background:#162a21}
 .gh svg{width:18px;height:18px}
 main{max-width:var(--larg);margin:0 auto;padding:0 var(--gut)}
@@ -193,3 +193,10 @@ main{max-width:var(--larg);margin:0 auto;padding:0 var(--gut)}
 #visao-hoje:checked~.visoes label[for=visao-hoje],#visao-posse:checked~.visoes label[for=visao-posse]{background:var(--ink);color:var(--bg)}
 #visao-hoje:focus-visible~.visoes label[for=visao-hoje],#visao-posse:focus-visible~.visoes label[for=visao-posse]{outline:3px solid var(--blue);outline-offset:-3px}
 #visao-hoje:checked~.visao-posse,#visao-posse:checked~.visao-hoje{display:none}
+.compartilhar{flex:none;display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;padding:0;border:1px solid #2c4339;border-radius:999px;background:transparent;color:var(--hero-ink);font:inherit;cursor:pointer}
+.compartilhar[hidden]{display:none}
+.compartilhar:hover{background:#162a21}
+.compartilhar svg{width:20px;height:20px}
+.compartilhar.ok svg{display:none}
+.compartilhar.ok::after{content:"\2713";font-size:22px;font-weight:600;color:var(--yellow)}
+@media print{.compartilhar{display:none}}
