@@ -34,10 +34,17 @@ def _json(dado: object) -> str:
 
 
 def cabecalho(
-    titulo: str, descricao: str, caminho: str, schema: list[dict[str, object]] | None = None
+    titulo: str,
+    descricao: str,
+    caminho: str,
+    schema: list[dict[str, object]] | None = None,
+    imagem: str | None = None,
+    imagem_alt: str | None = None,
 ) -> str:
     """Tags do <head> que ajudam buscadores e agentes: canônico, Open Graph, Twitter e dados estruturados."""
     pagina = url(caminho)
+    imagem = f"{SITE}/{imagem or 'og.png'}"  # o cartão da própria página, ou o da marca
+    alt = imagem_alt or f"{NOME}: quem ocupa o poder no Brasil, com a fonte oficial ao lado"
     completo = f"{titulo} | {NOME}"
     tags = [
         f'<link rel="canonical" href="{escape(pagina)}">',
@@ -47,13 +54,13 @@ def cabecalho(
         f'<meta property="og:title" content="{escape(completo)}">',
         f'<meta property="og:description" content="{escape(descricao)}">',
         f'<meta property="og:url" content="{escape(pagina)}">',
-        f'<meta property="og:image" content="{SITE}/og.png"><meta property="og:image:width" content="1200">',
+        f'<meta property="og:image" content="{escape(imagem)}"><meta property="og:image:width" content="1200">',
         '<meta property="og:image:height" content="630">',
-        f'<meta property="og:image:alt" content="{NOME}: quem ocupa o poder no Brasil, com a fonte oficial ao lado">',
+        f'<meta property="og:image:alt" content="{escape(alt)}">',
         '<meta name="twitter:card" content="summary_large_image">',
         f'<meta name="twitter:title" content="{escape(completo)}">',
         f'<meta name="twitter:description" content="{escape(descricao)}">',
-        f'<meta name="twitter:image" content="{SITE}/og.png">',
+        f'<meta name="twitter:image" content="{escape(imagem)}">',
     ]
     if schema:
         tags.append(

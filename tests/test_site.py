@@ -746,3 +746,69 @@ def test_whoever_is_in_office_without_an_election_of_their_own_still_counts_in_t
         "Mandato atual" in ficha and "A campanha de" not in ficha and "mandato informado pelo Senado" in ficha
     )
     assert "Zé do Senado" in texto(saida, "pessoas.html")
+
+
+def test_every_page_has_a_share_button_that_only_works_with_javascript(warehouse, tmp_path):
+    saida = site(warehouse, tmp_path)
+    for caminho in (
+        "index.html",
+        "estados.html",
+        "estado/RJ.html",
+        "pessoa/ana-exemplo-2026-rj-1.html",
+        "cargos.html",
+    ):
+        pagina = texto(saida, caminho)
+        topo = pagina[pagina.index('<div class="acoes">') : pagina.index("</header>")]
+        assert 'class="compartilhar" hidden' in topo and 'aria-label="Compartilhar esta página"' in topo, (
+            caminho
+        )
+        assert topo.index('class="compartilhar"') < topo.index('class="gh"'), (
+            caminho
+        )  # primeiro, à direita do menu
+        assert 'rel="canonical"' in pagina, caminho  # é o endereço que o botão compartilha
+    js = texto(saida, "app.js")
+    assert (
+        "navigator.share" in js
+        and "clipboard.writeText" in js
+        and "2000" in js
+        and 'link[rel="canonical"]' in js
+    )
+
+
+def test_person_and_state_pages_share_their_own_card_and_the_others_share_the_brand_one(warehouse, tmp_path):
+    from PIL import Image
+
+    saida = site(warehouse, tmp_path)
+    ana = texto(saida, "pessoa/ana-exemplo-2026-rj-1.html")
+    assert (
+        'property="og:image" content="https://nocargo.codigopublicobrasil.com.br/og/pessoa/ana-exemplo-2026-rj-1.jpg"'
+        in ana
+    )
+    assert (
+        'name="twitter:image" content="https://nocargo.codigopublicobrasil.com.br/og/pessoa/ana-exemplo-2026-rj-1.jpg"'
+        in ana
+    )
+    assert "Ana Exemplo, deputado federal" in ana.split('property="og:image:alt" content="')[1].split('"')[0]
+    rj = texto(saida, "estado/RJ.html")
+    assert 'property="og:image" content="https://nocargo.codigopublicobrasil.com.br/og/estado/RJ.jpg"' in rj
+    for caminho in ("index.html", "estados.html", "pessoas.html", "cargos.html"):
+        assert 'content="https://nocargo.codigopublicobrasil.com.br/og.png"' in texto(saida, caminho), caminho
+    for cartao in ("og/pessoa/ana-exemplo-2026-rj-1.jpg", "og/estado/RJ.jpg", "og/estado/SP.jpg"):
+        with Image.open(saida / cartao) as imagem:
+            assert imagem.size == (1200, 630), cartao
+    assert (saida / "og/estado/RJ.jpg").read_bytes() != (saida / "og/estado/SP.jpg").read_bytes()
+
+
+def test_an_unreadable_photo_does_not_break_the_cards(warehouse, tmp_path):
+    origem = tmp_path / "fotos" / "2026" / "RJ"
+    origem.mkdir(parents=True)
+    (origem / "1.jpg").write_bytes(b"isto nao e uma imagem")
+    saida = tmp_path / "dist"
+    construir(warehouse, saida, HOJE, fotos=tmp_path / "fotos")
+    assert (saida / "og/pessoa/ana-exemplo-2026-rj-1.jpg").is_file()
+
+
+def test_the_header_stays_at_the_top_on_every_width(warehouse, tmp_path):
+    css = texto(site(warehouse, tmp_path), "style.css")
+    topo = css[css.index(".topo{") : css.index("}", css.index(".topo{"))]
+    assert "position:sticky" in topo and "top:0" in topo  # fora de qualquer media query

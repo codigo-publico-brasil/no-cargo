@@ -107,6 +107,8 @@ def pagina(
     descricao: str = "",
     caminho: str | None = None,
     schema: list[dict[str, object]] | None = None,
+    imagem: str | None = None,
+    imagem_alt: str | None = None,
 ) -> str:
     """A página inteira. Com `caminho` (relativo à raiz do site), leva canônico, cartões de compartilhamento e dados estruturados."""
     menu = "".join(
@@ -115,7 +117,9 @@ def pagina(
     )
     fontes = " &middot; ".join(f'<a href="{url}">{nome}</a>' for nome, url in FONTES)
     descricao = descricao or "Quem ocupa o poder no Brasil, pelos três poderes, com a fonte oficial ao lado."
-    busca = seo.cabecalho(titulo, descricao, caminho, schema) if caminho is not None else ""
+    busca = (
+        seo.cabecalho(titulo, descricao, caminho, schema, imagem, imagem_alt) if caminho is not None else ""
+    )
     correcao = seo.link_de_correcao(titulo, caminho or "")
     return _links_externos_em_nova_guia(
         '<!doctype html>\n<html lang="pt-BR" data-theme="light">\n<head>\n<meta charset="utf-8">\n'
@@ -128,7 +132,12 @@ def pagina(
         f'<img src="{raiz}no-cargo.svg" alt="" width="32" height="32">'
         '<span class="marca-nome">No Cargo</span></a>'
         f'<nav class="nav" aria-label="Principal">{menu}</nav>'
-        f'<div class="acoes"><a class="gh" href="{REPO}" aria-label="Código do No Cargo no GitHub" title="Código do No Cargo no GitHub">'
+        '<div class="acoes"><button type="button" class="compartilhar" hidden aria-label="Compartilhar esta página"'
+        ' title="Compartilhar esta página"><svg viewBox="0 0 24 24" aria-hidden="true"><g stroke="currentColor" '
+        'stroke-width="2" stroke-linecap="round"><path d="M8 11l8-4.5M8 13l8 4.5"/></g><g fill="currentColor">'
+        '<circle cx="18" cy="5.5" r="2.8"/><circle cx="6" cy="12" r="2.8"/><circle cx="18" cy="18.5" r="2.8"/></g>'
+        "</svg></button>"
+        f'<a class="gh" href="{REPO}" aria-label="Código do No Cargo no GitHub" title="Código do No Cargo no GitHub">'
         f'<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="{ICONE_GITHUB}"/></svg></a></div></div></header>\n<div class="faixa-cores"></div>\n'
         f"<main>\n{corpo}\n</main>\n"
         '<footer class="rodape"><div><b>No Cargo</b>'
@@ -424,6 +433,22 @@ def nome_do_local(uf: str) -> str:
     return "Brasil" if uf == "BR" else UFS.get(uf, (uf,))[0]
 
 
+def imagem_da_pessoa(r: Row) -> str:
+    """Onde fica o cartão de compartilhamento da pessoa, relativo à raiz do site."""
+    return "og/pessoa/" + arquivo_da_ficha(r["nome_urna"], r["id_candidatura"]).removesuffix(".html") + ".jpg"
+
+
+def imagem_do_estado(uf: str) -> str:
+    return f"og/estado/{uf}.jpg"
+
+
+def texto_do_cartao_da_pessoa(r: Row) -> tuple[list[str], str]:
+    """As linhas e a etiqueta que o cartão da pessoa traz, com o que a base diz."""
+    onde = "Brasil" if r["uf"] == "BR" else nome_do_local(r["uf"])
+    etiqueta = _de_onde_veio(r)
+    return [f"{r['cargo']} · {onde}", str(r["partido"] or "Sem partido")], etiqueta[:1].upper() + etiqueta[1:]
+
+
 def _de_onde_veio(r: Row) -> str:
     """`eleito em 2022` ou, para quem está no cargo sem eleição própria, `no cargo desde 2024`."""
     return f"no cargo desde {r['ano_inicio']}" if r.get("sem_eleicao") else f"eleito em {r['ano_eleicao']}"
@@ -688,6 +713,8 @@ def estado(uf: str, ano: int, visoes: dict[str, list[Row]], capturado: date | No
         raiz="../",
         descricao=f"Governador, senadores e deputados de {nome} hoje e depois da posse de {ano + 1}, com histórico, selo e a fonte oficial.",
         caminho=f"estado/{uf}.html",
+        imagem=imagem_do_estado(uf),
+        imagem_alt=f"{nome}: quem ocupa os cargos hoje e quem assume em {ano + 1}",
         schema=[seo.migalhas([("Brasil", "index.html"), (nome, f"estado/{uf}.html")])],
     )
 
@@ -998,6 +1025,8 @@ def ficha(
             "mandatos, candidaturas, votos e campanha, com a fonte oficial."
         ),
         caminho=caminho,
+        imagem=imagem_da_pessoa(r),
+        imagem_alt=f"{r['nome_urna']}, {cargo.lower()} {onde} ({r['partido']}): mandatos, campanha e a fonte oficial",
         schema=[
             seo.pessoa_schema(
                 r["nome_urna"], cargo, r["partido"], estado, caminho, r["fonte_url"], r["dt_captura"]

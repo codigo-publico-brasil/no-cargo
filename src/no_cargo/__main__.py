@@ -17,7 +17,7 @@ from pathlib import Path
 
 import duckdb
 
-from no_cargo import dados, paginas, seo, textos
+from no_cargo import cartoes, dados, paginas, seo, textos
 from no_cargo.formato import arquivo_da_ficha
 
 ENV_WAREHOUSE = "NO_CARGO_WAREHOUSE"
@@ -127,6 +127,17 @@ def construir(
         escrever(saida / "pessoa" / arquivo, paginas.ficha(r, hoje, ocupacoes, candidaturas, desde))
         escritas.append(f"pessoa/{arquivo}")
         total += 1
+    for r in pessoas:
+        linhas, etiqueta = paginas.texto_do_cartao_da_pessoa(r)
+        foto = saida / r["foto_local"] if r.get("foto_local") else None
+        cartoes.cartao(str(r["nome_urna"]), linhas, etiqueta, saida / paginas.imagem_da_pessoa(r), foto)
+    for uf, (nome, _) in paginas.UFS.items():
+        cartoes.cartao(
+            nome,
+            ["Quem ocupa os cargos hoje", f"e quem assume em {ano + 1}"],
+            f"Estado · {uf}",
+            saida / paginas.imagem_do_estado(uf),
+        )
     quantas = Counter(r["cargo"] for r in eleitos)
     escrever(saida / "404.html", paginas.nao_encontrada())
     escrever(saida / "robots.txt", seo.robots())

@@ -3,7 +3,10 @@ name = "no-cargo"
 version = "0.0.0"
 description = "No Cargo: quem ocupa o poder no Brasil, pelos três poderes, com a fonte oficial ao lado. Gera um site estático a partir do esquema marts da plataforma de dados."
 requires-python = ">=3.13"
-dependencies = ["duckdb>=1.1"]
+dependencies = [
+    "duckdb>=1.1",
+    "pillow>=13.0.0",
+]
 
 [project.scripts]
 no-cargo = "no_cargo.__main__:main"
