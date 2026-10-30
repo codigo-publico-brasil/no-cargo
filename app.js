@@ -72,6 +72,33 @@
     });
   }
 
+  // Compartilhar, como no theme.js do guia de identidade: abre o menu do aparelho (WhatsApp, redes, e-mail) com o
+  // endereço canônico da página; sem ele, copia o link e troca o ícone por uma marca de verificação por 2 segundos.
+  // Sem JavaScript o botão não aparece.
+  var compartilhar = document.querySelector(".compartilhar");
+  if (compartilhar && (navigator.share || (navigator.clipboard && navigator.clipboard.writeText))) {
+    compartilhar.hidden = false;
+    var iconeCompartilhar = compartilhar.innerHTML;
+    var iconeFeito = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    var rotular = function (texto) { compartilhar.setAttribute("aria-label", texto); compartilhar.title = texto; };
+    compartilhar.addEventListener("click", function () {
+      var canonico = document.querySelector('link[rel="canonical"]');
+      var url = canonico ? canonico.href : location.href.split("#")[0];
+      if (navigator.share) {
+        navigator.share({ title: document.title, url: url }).catch(function () { /* cancelado */ });
+        return;
+      }
+      navigator.clipboard.writeText(url).then(function () {
+        compartilhar.innerHTML = iconeFeito;
+        rotular("Link copiado");
+        setTimeout(function () {
+          compartilhar.innerHTML = iconeCompartilhar;
+          rotular("Compartilhar esta página");
+        }, 2000);
+      }).catch(function () { /* sem permissão para copiar */ });
+    });
+  }
+
   // Passar o mouse (ou focar) em um partido da legenda destaca as cadeiras dele no hemiciclo.
   document.querySelectorAll(".hemiciclo").forEach(function (h) {
     function destacar(g) {
