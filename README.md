@@ -57,3 +57,4 @@ Ver [docs/publicacao.md](docs/publicacao.md).
 - **Código:** AGPL-3.0 (arquivo `LICENSE`).
 - **Dados curados que o site mostra:** CC BY 4.0. Cada dado vem de uma fonte oficial (TSE, Câmara dos Deputados, Senado Federal), que mantém as próprias condições de uso; o site sempre mostra a origem e a data de captura. Cite a fonte ao reutilizar.
 - **Fontes tipográficas** em `src/no_cargo/static/fonts/`: SIL Open Font License 1.1, com os avisos em `LICENSES.md` na mesma pasta.
+- **Fontes dos cartões de compartilhamento** em `src/no_cargo/cartoes/fontes/` (Fraunces e Inter em TrueType): SIL Open Font License 1.1.

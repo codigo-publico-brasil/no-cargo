@@ -2,16 +2,16 @@
 @font-face{font-family:Fraunces;font-weight:600;font-style:normal;font-display:swap;src:url(fonts/fraunces.woff2) format("woff2")}
 @font-face{font-family:Inter;font-weight:400 600;font-style:normal;font-display:swap;src:url(fonts/inter.woff2) format("woff2")}
 @font-face{font-family:"JetBrains Mono";font-weight:400 600;font-style:normal;font-display:swap;src:url(fonts/jetbrains-mono.woff2) format("woff2")}
-:root{--larg:720px;--gut:20px;--borda:color-mix(in srgb,var(--muted) 55%,var(--bg));--leve:color-mix(in srgb,var(--line) 40%,var(--surface))}
+:root{--h-topo:64px;--larg:720px;--gut:20px;--borda:color-mix(in srgb,var(--muted) 55%,var(--bg));--leve:color-mix(in srgb,var(--line) 40%,var(--surface))}
 *{box-sizing:border-box}
-html{scroll-behavior:smooth}
+html{scroll-behavior:smooth;scroll-padding-top:calc(var(--h-topo) + 8px)}
 body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
 a{color:var(--green-ink)}
 :focus-visible{outline:3px solid var(--yellow);outline-offset:3px}
 h1,h2,h3{font-family:var(--serif);font-weight:600;font-variant-numeric:lining-nums;letter-spacing:-.01em;line-height:1.15;margin:0}
 h2{font-size:24px}h3{font-size:20px}
 .so-leitor{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-.topo{background:var(--hero-bg);color:var(--hero-ink)}
+.topo{position:sticky;top:0;z-index:20;background:var(--hero-bg);color:var(--hero-ink)}
 .miolo{max-width:var(--larg);margin:0 auto;padding:0 var(--gut);display:flex;align-items:center;gap:8px;min-height:64px}
 .faixa-cores{height:6px;background:linear-gradient(90deg,var(--green) 0 50%,var(--yellow) 50% 75%,var(--blue) 75%)}
 .marca{margin-right:auto;display:flex;align-items:center;gap:10px;min-height:48px;color:var(--hero-ink);text-decoration:none}
@@ -72,7 +72,7 @@ main{max-width:var(--larg);margin:0 auto;padding:0 var(--gut)}
 .recolhivel>summary::after{content:"+";font-family:var(--mono);font-size:22px;color:var(--green-ink)}
 .recolhivel[open]>summary::after{content:"\2212"}
 .recolhivel[open]>summary{margin-bottom:10px}
-.controles{position:sticky;top:0;z-index:2;box-shadow:0 8px 20px rgba(0,0,0,.12)}
+.controles{position:sticky;top:var(--h-topo);z-index:2;box-shadow:0 8px 20px rgba(0,0,0,.12)}
 .contagem{margin:10px 0 0;color:var(--muted);font-size:14px}
 .itens{display:flex;flex-direction:column;gap:10px;margin-top:10px}
 .pessoa{display:flex;align-items:center;gap:14px;padding:12px 14px;color:var(--ink);text-decoration:none}
@@ -197,6 +197,4 @@ main{max-width:var(--larg);margin:0 auto;padding:0 var(--gut)}
 .compartilhar[hidden]{display:none}
 .compartilhar:hover{background:#162a21}
 .compartilhar svg{width:20px;height:20px}
-.compartilhar.ok svg{display:none}
-.compartilhar.ok::after{content:"\2713";font-size:22px;font-weight:600;color:var(--yellow)}
 @media print{.compartilhar{display:none}}
