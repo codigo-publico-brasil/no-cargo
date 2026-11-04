@@ -1,8 +1,8 @@
-"""Consultas ao warehouse. Lêem só o esquema `marts` da plataforma de dados, em modo somente leitura.
+"""Consultas ao datalake. Lêem só o esquema `marts` da plataforma (e `metadata.capturas`), em modo somente leitura.
 
 A aplicação não importa nada da camada de dados: o contrato entre as duas é o esquema `marts` (colunas e tipos
 garantidos pelo contrato do dbt). Nada é calculado ou estimado aqui além de somas e contagens do que a fonte diz:
-quem ocupa cada cargo, e de quando a quando, vem de `app_cargo_ocupantes`.
+quem ocupa cada cargo, e de quando a quando, vem de `fct_cargos_ocupacoes`.
 """
 
 from datetime import date
@@ -12,6 +12,20 @@ import duckdb
 
 Row = dict[str, Any]
 Connection = duckdb.DuckDBPyConnection
+
+# O datalake público da plataforma: o catálogo (`catalogo.duckdb`) e, ao lado, os arquivos, como as fotos.
+DATALAKE = "https://datalake.codigopublicobrasil.com.br"
+
+
+def conectar(datalake: str = DATALAKE) -> Connection:
+    """Anexa o catálogo do datalake em modo somente leitura. Não há dado local: `marts.` e `metadata.` são do catálogo."""
+    con = duckdb.connect()
+    con.execute("INSTALL httpfs")
+    con.execute("LOAD httpfs")
+    con.execute("ATTACH '" + f"{datalake}/catalogo.duckdb".replace("'", "''") + "' AS datalake (READ_ONLY)")
+    con.execute("USE datalake")
+    return con
+
 
 # Os cargos de cada poder, na ordem em que a página os mostra.
 EXECUTIVO = ("Presidente", "Governador")
@@ -29,39 +43,84 @@ def ultimo_ano(con: Connection) -> int:
     """O ano da eleição geral mais recente com eleitos."""
     marcadores = ", ".join("?" for _ in CARGOS)
     found = con.execute(
-        f"SELECT max(ano_eleicao) FROM marts.app_pessoa_campanhas WHERE fl_eleito AND cargo IN ({marcadores})",
+        f"SELECT max(ano_eleicao) FROM {_CAMPANHAS} WHERE fl_eleito AND cargo IN ({marcadores})",
         CARGOS,
     ).fetchone()
     if not found or found[0] is None:
-        raise SystemExit("marts.app_pessoa_campanhas está vazio: rode a plataforma de dados antes.")
+        raise SystemExit("Não há eleitos em marts.fct_candidaturas: rode a plataforma de dados antes.")
     return int(found[0])
 
 
-_SELECT = """
+# Um período em que uma pessoa ocupa um cargo num território, com os nomes juntados às dimensões. Só junta e
+# renomeia: quem ocupa o quê, e de quando a quando, é regra do `marts`. `fonte_url` vem da captura do dado.
+_OCUPANTES = """(
+    SELECT o.id_candidatura, o.id_pessoa, coalesce(ps.nome_publico, ps.nome_civil) AS nome, g.nome AS cargo,
+           t.sigla AS sigla_territorio, p.sigla AS partido, o.ano_inicio, o.dt_inicio, o.dt_fim AS dt_fim_prevista,
+           m.tipo_mandato, cap.url AS fonte_url, o.dt_captura
+    FROM marts.fct_cargos_ocupacoes o
+    JOIN marts.dim_cargos g ON g.id_cargo = o.id_cargo
+    LEFT JOIN marts.dim_territorios t ON t.id_territorio = o.id_territorio
+    LEFT JOIN marts.dim_partidos p ON p.id_partido = o.id_partido
+    LEFT JOIN marts.dim_pessoas ps ON ps.id_pessoa = o.id_pessoa
+    LEFT JOIN marts.fct_mandatos m ON m.id_candidatura = o.id_candidatura
+    LEFT JOIN metadata.capturas cap ON cap.id_captura = o.id_captura
+)"""
+
+# Uma candidatura, com a eleição e o cargo da disputa e os totais da campanha (nulos quando a fonte não entregou).
+_CAMPANHAS = """(
+    SELECT c.id_candidatura, c.id_pessoa, e.ano_eleicao, g.nome AS cargo, c.partido, c.resultado, c.fl_eleito,
+           k.valor_bens, k.valor_receitas, k.valor_despesas, cb.url AS fonte_url_bens,
+           cr.url AS fonte_url_receitas, cd.url AS fonte_url_despesas, k.dt_captura AS dt_captura_campanha
+    FROM marts.fct_candidaturas c
+    JOIN marts.dim_disputas d ON d.id_disputa = c.id_disputa
+    JOIN marts.dim_eleicoes e ON e.id_eleicao = d.id_eleicao
+    JOIN marts.dim_cargos g ON g.id_cargo = d.id_cargo
+    LEFT JOIN marts.fct_campanhas k ON k.id_candidatura = c.id_candidatura
+    LEFT JOIN metadata.capturas cb ON cb.id_captura = k.id_captura_bens
+    LEFT JOIN metadata.capturas cr ON cr.id_captura = k.id_captura_receitas
+    LEFT JOIN metadata.capturas cd ON cd.id_captura = k.id_captura_despesas
+)"""
+
+# A ficha da pessoa: `dim_pessoas` traz nome civil, nascimento, UF e profissões, cada um com a sua fonte (TSE,
+# Câmara ou Senado); `dim_pessoas_cadastro` é o cadastro parlamentar (Câmara e Senado), de onde vêm município,
+# site, rede social e a foto da casa. A URL de cada fonte vem da captura.
+_PESSOA = """(
+    SELECT p.id_pessoa, p.nome_civil, p.dt_nascimento, p.uf_nascimento, p.profissoes, p.fonte_nome_civil,
+           p.fonte_dt_nascimento, p.fonte_uf_nascimento, p.fonte_profissoes, p.foto_caminho,
+           capt.url AS fonte_tse_url, p.dt_captura_tse,
+           d.municipio_nascimento, d.site_url, d.rede_social_url, d.foto_url, d.fontes AS fonte_cadastro,
+           capd.url AS fonte_cadastro_url, d.dt_captura AS dt_captura_cadastro
+    FROM marts.dim_pessoas p
+    LEFT JOIN marts.dim_pessoas_cadastro d ON d.id_pessoa = p.id_pessoa
+    LEFT JOIN metadata.capturas capt ON capt.id_captura = p.id_captura_tse
+    LEFT JOIN metadata.capturas capd ON capd.id_captura = d.id_captura
+)"""
+
+_SELECT = f"""
 SELECT coalesce(b.id_candidatura,
-                CAST(b.ano_inicio AS VARCHAR) || ':' || coalesce(t.sigla, '--') || ':p' || CAST(b.id_pessoa AS VARCHAR)
+                CAST(b.ano_inicio AS VARCHAR) || ':' || coalesce(b.sigla_territorio, '--') || ':p'
+                || CAST(b.id_pessoa AS VARCHAR)
        ) AS id_candidatura,
        b.id_candidatura IS NULL AS sem_eleicao,
        coalesce(CAST(split_part(b.id_candidatura, ':', 1) AS INTEGER), b.ano_inicio) AS ano_eleicao,
-       coalesce(split_part(b.id_candidatura, ':', 2), t.sigla) AS uf, r.turno, b.cargo,
+       coalesce(split_part(b.id_candidatura, ':', 2), b.sigla_territorio) AS uf, r.turno, b.cargo,
        coalesce(c.nome_urna, b.nome) AS nome_urna, b.nome, b.partido,
        r.qtd_votos_nominais AS qtd_votos, r.percentual_votos_validos, b.id_pessoa, b.tipo_mandato,
        b.ano_inicio, b.dt_inicio, b.dt_fim_prevista, b.fonte_url, b.dt_captura,
        k.valor_bens, k.valor_receitas, k.valor_despesas, k.fonte_url_bens, k.fonte_url_receitas,
        k.fonte_url_despesas, k.dt_captura_campanha,
        p.foto_url, p.nome_civil, p.dt_nascimento, p.municipio_nascimento, p.uf_nascimento, p.profissoes,
-       p.site_url, p.rede_social_url, p.fontes AS fonte_cadastro, p.fonte_url AS fonte_cadastro_url,
-       p.dt_captura AS dt_captura_cadastro, c.ocupacao, coalesce(c.foto_caminho, p.foto_caminho) AS foto_caminho
-FROM marts.app_cargo_ocupantes b
+       p.site_url, p.rede_social_url, p.fonte_nome_civil, p.fonte_dt_nascimento, p.fonte_uf_nascimento,
+       p.fonte_profissoes, p.fonte_cadastro, p.fonte_cadastro_url, p.dt_captura_cadastro, p.fonte_tse_url,
+       p.dt_captura_tse, c.ocupacao, coalesce(c.foto_caminho, p.foto_caminho) AS foto_caminho
+FROM {_OCUPANTES} b
 LEFT JOIN marts.fct_candidaturas c ON c.id_candidatura = b.id_candidatura
-LEFT JOIN (SELECT DISTINCT nome, sigla FROM marts.dim_territorios WHERE tipo IN ('uf', 'pais')) t
-       ON t.nome = b.territorio
 LEFT JOIN (
     SELECT id_candidatura, turno, qtd_votos_nominais, percentual_votos_validos FROM marts.fct_resultados
     QUALIFY row_number() OVER (PARTITION BY id_candidatura ORDER BY turno DESC) = 1
 ) r ON r.id_candidatura = b.id_candidatura
-LEFT JOIN marts.app_pessoa_campanhas k ON k.id_candidatura = b.id_candidatura
-LEFT JOIN marts.app_pessoas p ON p.id_pessoa = b.id_pessoa
+LEFT JOIN {_CAMPANHAS} k ON k.id_candidatura = b.id_candidatura
+LEFT JOIN {_PESSOA} p ON p.id_pessoa = b.id_pessoa
 """
 
 
@@ -94,7 +153,7 @@ def data_da_posse(con: Connection, hoje: date) -> date | None:
     marcadores = ", ".join("?" for _ in CARGOS)
     linha = rows(
         con,
-        "SELECT max(inicio) AS posse FROM (SELECT cargo, min(dt_inicio) AS inicio FROM marts.app_cargo_ocupantes "
+        f"SELECT max(inicio) AS posse FROM (SELECT cargo, min(dt_inicio) AS inicio FROM {_OCUPANTES} "
         f"WHERE dt_inicio > ? AND cargo IN ({marcadores}) GROUP BY cargo)",
         (hoje, *CARGOS),
     )
@@ -129,7 +188,7 @@ def ids_em_mandato(con: Connection, hoje: date) -> set[int]:
     marcadores = ", ".join("?" for _ in CARGOS)
     linhas = rows(
         con,
-        "SELECT DISTINCT id_pessoa FROM marts.app_cargo_ocupantes "
+        f"SELECT DISTINCT id_pessoa FROM {_OCUPANTES} "
         f"WHERE dt_inicio <= ? AND dt_fim_prevista >= ? AND cargo IN ({marcadores})",
         (hoje, hoje, *CARGOS),
     )
@@ -146,7 +205,7 @@ def situacao_dos_cargos(con: Connection, ano: int) -> list[Row]:
         "FROM marts.dim_disputas d "
         "JOIN marts.dim_eleicoes e ON e.id_eleicao = d.id_eleicao "
         "JOIN marts.dim_cargos g ON g.id_cargo = d.id_cargo "
-        "LEFT JOIN marts.app_cargo_ocupantes o ON o.cargo = g.nome "
+        f"LEFT JOIN {_OCUPANTES} o ON o.cargo = g.nome "
         "  AND split_part(o.id_candidatura, ':', 1) = CAST(e.ano_eleicao AS VARCHAR) "
         "  AND split_part(o.id_candidatura, ':', 2) = d.ue "
         f"WHERE e.ano_eleicao = ? AND g.nome IN ({marcadores}) "
@@ -162,7 +221,7 @@ def candidaturas_das_pessoas(con: Connection, ids: list[int]) -> dict[int, list[
     """Candidaturas de cada pessoa em todas as eleições carregadas, da mais recente para a mais antiga."""
     linhas = rows(
         con,
-        "SELECT id_pessoa, ano_eleicao, cargo, partido, resultado, fl_eleito FROM marts.app_pessoa_campanhas "
+        f"SELECT id_pessoa, ano_eleicao, cargo, partido, resultado, fl_eleito FROM {_CAMPANHAS} "
         "WHERE list_contains(?, id_pessoa) ORDER BY ano_eleicao DESC",
         (ids,),
     )
@@ -176,9 +235,8 @@ def ocupacoes_das_pessoas(con: Connection, ids: list[int]) -> dict[int, list[Row
     """Todos os mandatos de cada pessoa na base (qualquer cargo), do mais recente para o mais antigo."""
     linhas = rows(
         con,
-        "SELECT id_pessoa, id_candidatura, cargo, territorio, partido, ano_inicio, dt_inicio, dt_fim_prevista, "
-        "base_do_inicio, tipo_mandato "
-        "FROM marts.app_cargo_ocupantes WHERE list_contains(?, id_pessoa) ORDER BY ano_inicio DESC, dt_inicio DESC",
+        "SELECT id_pessoa, id_candidatura, cargo, partido, ano_inicio, dt_inicio, dt_fim_prevista, tipo_mandato "
+        f"FROM {_OCUPANTES} WHERE list_contains(?, id_pessoa) ORDER BY ano_inicio DESC, dt_inicio DESC",
         (ids,),
     )
     por_pessoa: dict[int, list[Row]] = {}

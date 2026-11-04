@@ -1,29 +1,25 @@
 """Gera o site estático.
 
-Uso (depois de rodar a plataforma de dados):
+Uso:
     uv run no-cargo                                   # escreve em dist/
-    uv run no-cargo --warehouse caminho/warehouse.duckdb --saida dist
+    uv run no-cargo --datalake https://exemplo.org --saida dist
 
-O warehouse é aberto em modo somente leitura. Um arquivo DuckDB aceita um escritor por vez: com a plataforma
-carregando dados, a geração falha até ela terminar.
+Os dados vêm do catálogo público do datalake (anexado em modo somente leitura); nada é lido de disco.
+As fotos não são copiadas: as páginas apontam para o arquivo no datalake.
 """
 
 import argparse
 import os
 import shutil
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-
-import duckdb
 
 from no_cargo import cartoes, dados, paginas, seo, textos
 from no_cargo.formato import arquivo_da_ficha
 
-ENV_WAREHOUSE = "NO_CARGO_WAREHOUSE"
-DEFAULT_WAREHOUSE = "../dado-publico-brasil/data_store/warehouse.duckdb"
-ENV_FOTOS = "NO_CARGO_FOTOS"
-DEFAULT_FOTOS = "../dado-publico-brasil/data_store/fotos"  # <ano>/<UF>/<sequencial>.jpg, como o TSE publica
+ENV_DATALAKE = "NO_CARGO_DATALAKE"
 ESTATICOS = Path(__file__).parent / "static"
 
 
@@ -32,22 +28,12 @@ def escrever(caminho: Path, texto: str) -> None:
     caminho.write_text(texto, encoding="utf-8")
 
 
-def trazer_fotos(pessoas: list[dados.Row], origem: Path | None, saida: Path) -> int:
-    """Copia para o site a foto oficial (TSE) de cada pessoa, do ano da eleição dela, e marca a linha com o
-    caminho: as fotos são servidas pelo próprio site, nunca de outro domínio. Sem arquivo, sem foto local."""
-    if origem is None:
-        return 0
-    trazidas = 0
+def apontar_fotos(pessoas: list[dados.Row], datalake: str | None) -> None:
+    """Marca cada linha com o endereço da foto oficial (TSE) no datalake, do ano da eleição da pessoa.
+    Sem datalake ou sem caminho informado, sem foto do TSE."""
     for r in pessoas:
-        caminho = r.get("foto_caminho")
-        arquivo = origem / str(caminho) if caminho and (origem / str(caminho)).is_file() else None
-        if arquivo:
-            destino = Path("fotos") / str(caminho)
-            (saida / destino).parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(arquivo, saida / destino)
-            r["foto_local"] = destino.as_posix()
-            trazidas += 1
-    return trazidas
+        if datalake and r.get("foto_caminho"):
+            r["foto_local"] = f"{datalake}/{r['foto_caminho']}"
 
 
 def ligar_as_fichas(pessoas: list[dados.Row], visoes: dict[str, list[dados.Row]], ano: int) -> None:
@@ -70,7 +56,7 @@ def construir(
     con: dados.Connection,
     saida: Path,
     hoje: date | None = None,
-    fotos: Path | None = None,
+    datalake: str | None = None,
     agora: datetime | None = None,
 ) -> int:
     """Escreve o site em `saida` e devolve quantas páginas gerou."""
@@ -85,7 +71,7 @@ def construir(
     capturado = max((r["dt_captura"] for r in situacao if r["dt_captura"]), default=None)
     saida.mkdir(parents=True, exist_ok=True)
     shutil.copytree(ESTATICOS, saida, dirs_exist_ok=True)  # css, js, símbolo e fontes (arquivos binários)
-    trazer_fotos([*eleitos, *atuais], fotos, saida)
+    apontar_fotos([*eleitos, *atuais], datalake)
     visoes = {"hoje": hoje_linhas, "posse": posse_linhas}
     ligar_as_fichas([*eleitos, *atuais], visoes, ano)
     escritas: list[str] = [
@@ -127,10 +113,11 @@ def construir(
         escrever(saida / "pessoa" / arquivo, paginas.ficha(r, hoje, ocupacoes, candidaturas, desde))
         escritas.append(f"pessoa/{arquivo}")
         total += 1
-    for r in pessoas:
-        linhas, etiqueta = paginas.texto_do_cartao_da_pessoa(r)
-        foto = saida / r["foto_local"] if r.get("foto_local") else None
-        cartoes.cartao(str(r["nome_urna"]), linhas, etiqueta, saida / paginas.imagem_da_pessoa(r), foto)
+    with ThreadPoolExecutor(max_workers=16) as pool:  # as fotos vêm do datalake: baixar em paralelo
+        fotos = pool.map(lambda r: cartoes.baixar(r["foto_local"]) if r.get("foto_local") else None, pessoas)
+        for r, foto in zip(pessoas, fotos, strict=True):
+            linhas, etiqueta = paginas.texto_do_cartao_da_pessoa(r)
+            cartoes.cartao(str(r["nome_urna"]), linhas, etiqueta, saida / paginas.imagem_da_pessoa(r), foto)
     for uf, (nome, _) in paginas.UFS.items():
         cartoes.cartao(
             nome,
@@ -143,31 +130,19 @@ def construir(
     escrever(saida / "robots.txt", seo.robots())
     escrever(saida / "sitemap.xml", seo.sitemap([(c, capturado) for c in escritas]))
     escrever(saida / "llms.txt", seo.llms(ano, capturado, dict(quantas)))
-    escrever(saida / "CNAME", seo.SITE.removeprefix("https://") + "\n")  # domínio próprio no GitHub Pages
-    escrever(saida / ".nojekyll", "")  # o Pages não passa o site pelo Jekyll
     return total
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Gera o site No Cargo a partir do warehouse da plataforma.")
+    parser = argparse.ArgumentParser(description="Gera o site No Cargo a partir do datalake público.")
     parser.add_argument(
-        "--warehouse", type=Path, default=Path(os.environ.get(ENV_WAREHOUSE, DEFAULT_WAREHOUSE))
+        "--datalake", default=os.environ.get(ENV_DATALAKE) or dados.DATALAKE, help="endereço base do datalake"
     )
     parser.add_argument("--saida", type=Path, default=Path("dist"))
-    parser.add_argument(
-        "--fotos",
-        type=Path,
-        default=Path(os.environ.get(ENV_FOTOS, DEFAULT_FOTOS)),
-        help="pasta das fotos do TSE",
-    )
     args = parser.parse_args()
-    con = duckdb.connect(str(args.warehouse), read_only=True)
+    con = dados.conectar(args.datalake)
     try:
-        total = construir(con, args.saida, fotos=args.fotos if args.fotos.is_dir() else None)
+        total = construir(con, args.saida, datalake=args.datalake)
     finally:
         con.close()
     print(f"{total} páginas em {args.saida}")
-
-
-if __name__ == "__main__":
-    main()

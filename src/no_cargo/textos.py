@@ -105,7 +105,7 @@ def como_calculamos() -> str:
         "<li>Os selos Novato, Reeleito e Retorno são iguais para todos os partidos.</li>"
         "<li>Cada partido aparece na sua cor de marca, registrada no Wikidata. Partido sem cor registrada aparece em cinza, e nenhuma cor é inventada. A ordem é sempre do maior para o menor número de cadeiras.</li>"
         "<li>Só dados públicos e oficiais, sem CPF, endereço ou telefone. Sem antecedentes, processos ou palavras de opinião.</li></ul>"
-        "<h2>De onde vêm as fotos</h2><p>As fotos vêm direto dos sites da Câmara dos Deputados e do Senado Federal: o seu navegador as busca nesses sites, que podem registrar o acesso (não informamos de qual página você vem). Quem não tem foto na fonte aparece com um desenho.</p>"
+        "<h2>De onde vêm as fotos</h2><p>As fotos de quem foi candidato vêm do TSE e ficam no datalake do projeto (datalake.codigopublicobrasil.com.br); as de quem exerce mandato vêm direto dos sites da Câmara dos Deputados e do Senado Federal. O seu navegador as busca nesses endereços, que podem registrar o acesso (não informamos de qual página você vem). Quem não tem foto na fonte aparece com um desenho.</p>"
         "<h2>Encontrou um erro?</h2><p>Abra uma issue pública com a página, o dado e o link da fonte oficial: o repositório é o canal de correção. Corrigimos o que estiver errado, mostrando a data da correção.</p>"
         f'<p><a href="{seo.link_de_correcao("Como calculamos", "como-calculamos.html")}">Abrir uma issue de correção &#8599;</a></p>'
         "</div>",

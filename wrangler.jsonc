@@ -1,0 +1,8 @@
+{
+  // Site estático no Cloudflare (Worker só com assets). Observabilidade desligada: não guardamos acessos.
+  "name": "nocargo",
+  "compatibility_date": "2026-11-01",
+  "assets": { "directory": "./dist", "not_found_handling": "404-page" },
+  "observability": { "enabled": false },
+  "workers_dev": true
+}

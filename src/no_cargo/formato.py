@@ -85,11 +85,11 @@ def tempo(de: date, ate: date) -> str:
     return " e ".join(partes)
 
 
-def foto(url: str | None, nome: str, tamanho: int = 64, local: str | None = None, raiz: str = "") -> str:
-    """A foto do TSE servida pelo próprio site (`local`, relativo à raiz) vale primeiro; depois a do cadastro; senão o desenho."""
+def foto(url: str | None, nome: str, tamanho: int = 64, local: str | None = None) -> str:
+    """A foto do TSE, no datalake (`local`, endereço completo), vale primeiro; depois a do cadastro; senão o desenho."""
     if local:
         return (
-            f'<img class="foto" src="{e(raiz + local)}" alt="Foto de {e(nome)}" width="{tamanho}" height="{tamanho}" '
+            f'<img class="foto" src="{e(local)}" alt="Foto de {e(nome)}" width="{tamanho}" height="{tamanho}" '
             'loading="lazy">'
         )
     if url:

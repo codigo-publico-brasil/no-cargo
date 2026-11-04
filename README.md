@@ -2,7 +2,7 @@
 
 **Quem ocupa o poder no Brasil, pelos três poderes, com a fonte oficial ao lado.**
 
-Aplicação do projeto [Código Público Brasil](https://github.com/codigo-publico-brasil). Gera um **site estático** a partir do esquema `marts` da [plataforma de dados](https://github.com/codigo-publico-brasil/dado-publico-brasil), sem servidor próprio, para publicar em qualquer hospedagem de arquivos (GitHub Pages, Cloudflare Pages ou um servidor comum).
+Aplicação do projeto [Código Público Brasil](https://github.com/codigo-publico-brasil). Gera um **site estático** a partir do esquema `marts` do datalake público da [plataforma de dados](https://github.com/codigo-publico-brasil/dado-publico-brasil), sem servidor próprio, para publicar em qualquer hospedagem de arquivos (Cloudflare, GitHub Pages ou um servidor comum).
 
 ## O que mostra hoje
 
@@ -23,16 +23,14 @@ Aplicação do projeto [Código Público Brasil](https://github.com/codigo-publi
 
 ## Como executar
 
-Requisitos: Python 3.13 e [uv](https://docs.astral.sh/uv/). Com os dados já carregados pela plataforma (e a plataforma parada, porque o DuckDB aceita um escritor por vez):
+Requisitos: Python 3.13, [uv](https://docs.astral.sh/uv/) e acesso à internet. Os dados vêm do datalake público (`https://datalake.codigopublicobrasil.com.br/catalogo.duckdb`), anexado em modo somente leitura; nada é lido de disco:
 
 ```bash
 uv sync
 uv run no-cargo            # escreve o site em dist/
 ```
 
-O arquivo do warehouse vem de `NO_CARGO_WAREHOUSE` (padrão: `../dado-publico-brasil/data_store/warehouse.duckdb`; modelo em `.env.example`). Abra `dist/index.html` no navegador.
-
-As fotos oficiais do TSE vêm de `NO_CARGO_FOTOS` (padrão: `../dado-publico-brasil/data_store/fotos`, no formato `<ano>/<UF>/<sequencial>.jpg`). O site copia para `dist/fotos/` só a foto de cada eleito do ano e serve do próprio domínio; sem a pasta, gera sem elas.
+O endereço base do datalake pode ser trocado por `NO_CARGO_DATALAKE` (modelo em `.env.example`). As fotos oficiais do TSE não são copiadas: as páginas apontam para o arquivo no datalake. Abra `dist/index.html` no navegador.
 
 Antes de abrir um PR:
 
@@ -50,7 +48,7 @@ Ver [docs/publicacao.md](docs/publicacao.md).
 - `src/no_cargo/paginas.py` e `textos.py`: as páginas, como texto HTML, sem motor de templates.
 - `src/no_cargo/seo.py`: canônico, compartilhamento, dados estruturados, robots, sitemap e llms.txt.
 - `src/no_cargo/static/`: `style.css` (mobile primeiro) e `app.js` (filtro e ordem das listas).
-- `tests/`: um warehouse pequeno, inventado, com o esquema `marts`.
+- `tests/`: um banco pequeno, inventado, com o esquema `marts`; `test_contrato.py` confere o `manifesto.json` publicado.
 
 ## Licenças
 
