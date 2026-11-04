@@ -2,7 +2,7 @@
 
 **Quem ocupa o poder no Brasil, pelos três poderes, com a fonte oficial ao lado.**
 
-Aplicação do projeto [Código Público Brasil](https://github.com/codigo-publico-brasil). Gera um **site estático** a partir do esquema `marts` do datalake público da [plataforma de dados](https://github.com/codigo-publico-brasil/dado-publico-brasil), sem servidor próprio, para publicar em qualquer hospedagem de arquivos (GitHub Pages, Cloudflare Pages ou um servidor comum).
+Aplicação do projeto [Código Público Brasil](https://github.com/codigo-publico-brasil). Gera um **site estático** a partir do esquema `marts` do datalake público da [plataforma de dados](https://github.com/codigo-publico-brasil/dado-publico-brasil), sem servidor próprio, para publicar em qualquer hospedagem de arquivos (Cloudflare, GitHub Pages ou um servidor comum).
 
 ## O que mostra hoje
 

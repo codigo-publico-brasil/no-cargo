@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Gera o site e publica no Cloudflare Pages por upload direto (wrangler).
+# Gera o site e publica no Cloudflare (Worker com assets estáticos) por upload direto (wrangler).
 # Uso: scripts/publicar.sh            gera e envia
 #      scripts/publicar.sh --sem-push só gera dist/, sem enviar (para conferir)
-# Lê CF_PAGES_PROJETO, CLOUDFLARE_ACCOUNT_ID e CLOUDFLARE_API_TOKEN do .env (modelo em .env.example).
+# Lê CLOUDFLARE_ACCOUNT_ID e CLOUDFLARE_API_TOKEN do .env (modelo em .env.example).
 set -euo pipefail
 
 raiz="$(cd "$(dirname "$0")/.." && pwd)"
@@ -27,11 +27,9 @@ if [ -f .env ]; then
   . ./.env
   set +a
 fi
-: "${CF_PAGES_PROJETO:?Defina CF_PAGES_PROJETO no .env}"
 : "${CLOUDFLARE_ACCOUNT_ID:?Defina CLOUDFLARE_ACCOUNT_ID no .env}"
 : "${CLOUDFLARE_API_TOKEN:?Defina CLOUDFLARE_API_TOKEN no .env}"
 export CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN
 
-npx --yes wrangler pages deploy dist --project-name "$CF_PAGES_PROJETO" --branch main \
-  --commit-hash "$(git rev-parse HEAD)" --commit-message "Publica o site ($branch $commit)"
+npx --yes wrangler deploy --message "Publica o site ($branch $commit)"
 echo "Publicado: https://nocargo.codigopublicobrasil.com.br ($commit)"
