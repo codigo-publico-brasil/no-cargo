@@ -4,12 +4,15 @@ import re
 from datetime import date, datetime
 from pathlib import Path
 
+from PIL import Image
+
 from no_cargo import cores, dados, formato, seo
 from no_cargo.__main__ import construir
 from no_cargo.cores import SEM_COR
 from no_cargo.paginas import FONTES, REPO, SITE_MAE, pagina_da_fonte, sem_acento
 
 HOJE = date(2026, 10, 25)
+DATALAKE = "https://datalake.invalid"  # .invalid nunca resolve: a foto dos cartões falha logo, sem rede
 
 
 def site(warehouse, tmp_path: Path) -> Path:
@@ -347,7 +350,7 @@ def test_the_people_page_lists_everyone_elected_in_alphabetical_order_without_ra
     )
     total = (
         warehouse.execute(
-            "SELECT count(*) FROM marts.app_pessoa_campanhas WHERE ano_eleicao = 2026 AND fl_eleito"
+            "SELECT count(*) FROM marts.fct_candidaturas WHERE id_candidatura LIKE '2026:%' AND fl_eleito"
         ).fetchone()[0]
         + 3
     )  # mais os 3 em mandato
@@ -395,7 +398,7 @@ def test_structured_data_is_valid_json_and_the_person_page_has_only_public_facts
     )
 
 
-def test_the_site_publishes_robots_sitemap_llms_404_and_the_domain_for_github_pages(warehouse, tmp_path):
+def test_the_site_publishes_robots_sitemap_llms_and_404(warehouse, tmp_path):
     saida = site(warehouse, tmp_path)
     robots = texto(saida, "robots.txt")
     assert (
@@ -410,9 +413,7 @@ def test_the_site_publishes_robots_sitemap_llms_404_and_the_domain_for_github_pa
     assert "/404.html" not in sitemap and seo.url("pessoas.html") in sitemap
     assert seo.SITE in texto(saida, "llms.txt") and "provisório" in texto(saida, "llms.txt")
     assert 'content="noindex"' in texto(saida, "404.html")
-    assert (
-        texto(saida, "CNAME").strip() == seo.SITE.removeprefix("https://") and (saida / ".nojekyll").exists()
-    )
+    assert not (saida / "CNAME").exists() and not (saida / ".nojekyll").exists()
 
 
 def test_a_person_page_links_to_a_prefilled_correction_issue(warehouse, tmp_path):
@@ -516,51 +517,39 @@ def test_who_has_no_register_uses_the_tse_profession_and_birth_state(warehouse, 
     )
 
 
-def test_photos_of_the_year_are_copied_and_served_from_the_site_itself(warehouse, tmp_path):
-    origem = tmp_path / "fotos"
-    (origem / "2026" / "RJ").mkdir(parents=True)
-    (origem / "2026" / "RJ" / "1.jpg").write_bytes(b"\xff\xd8jpeg")  # Ana, 2026:RJ:1
-    (origem / "2022" / "RJ").mkdir(parents=True)
-    (origem / "2022" / "RJ" / "201.jpg").write_bytes(b"22")  # Gil Anterior, em mandato (eleito em 2022)
+def test_photos_of_the_year_point_to_the_lake_and_are_not_copied(warehouse, tmp_path):
     saida = tmp_path / "dist"
-    construir(warehouse, saida, HOJE, fotos=origem)
-    assert (saida / "fotos" / "2026" / "RJ" / "1.jpg").read_bytes() == b"\xff\xd8jpeg"
+    construir(warehouse, saida, HOJE, datalake=DATALAKE)
+    assert not (saida / "fotos").exists()
     ana = texto(saida, "pessoa/ana-exemplo-2026-rj-1.html")
-    assert (
-        'src="../fotos/2026/RJ/1.jpg"' in ana and "foto10.jpg" not in ana and "Foto: TSE" in ana
-    )  # a local vale primeiro
-    assert 'src="../fotos/2026/RJ/1.jpg"' in texto(saida, "estado/RJ.html")
-    bruno = texto(saida, "pessoa/bruno-modelo-2026-rj-2.html")  # sem arquivo: segue o desenho de reserva
-    assert "Sem foto" in bruno and "Foto: TSE" not in bruno
-    assert len(list((saida / "fotos").rglob("*.jp*g"))) == 2
+    assert f'src="{DATALAKE}/2026/RJ/1.jpg"' in ana and "foto10.jpg" not in ana and "Foto: TSE" in ana
+    assert f'src="{DATALAKE}/2026/RJ/1.jpg"' in texto(saida, "estado/RJ.html")
     gil = texto(
         saida, "pessoa/gil-anterior-2022-rj-201.html"
     )  # quem está em mandato usa a foto do ano da eleição
-    assert 'src="../fotos/2022/RJ/201.jpg"' in gil and "Foto: TSE" in gil
-    assert "Sem foto" in texto(
-        saida, "pessoa/sena-antiga-2018-rj-203.html"
-    )  # sem arquivo de 2018: desenho de reserva
+    assert f'src="{DATALAKE}/2022/RJ/201.jpg"' in gil and "Foto: TSE" in gil
 
 
-def test_without_a_photos_folder_nothing_is_copied_and_the_page_keeps_the_register_photo(warehouse, tmp_path):
-    saida = site(warehouse, tmp_path)
-    assert not (saida / "fotos").exists()
-    assert "foto10.jpg" in texto(saida, "pessoa/ana-exemplo-2026-rj-1.html")
+def test_without_a_photo_path_the_page_keeps_the_register_photo_or_the_drawing(warehouse, tmp_path):
+    warehouse.execute(
+        "UPDATE marts.fct_candidaturas SET foto_caminho = NULL WHERE id_candidatura = '2026:RJ:1'"
+    )
+    saida = tmp_path / "dist"
+    construir(warehouse, saida, HOJE, datalake=DATALAKE)
+    ana = texto(saida, "pessoa/ana-exemplo-2026-rj-1.html")
+    assert "foto10.jpg" in ana and "Foto: TSE" not in ana  # a do cadastro
 
 
 def test_the_home_shows_the_elected_president_with_photo_party_and_votes(warehouse, tmp_path, candidatura):
     candidatura(
         "2026:BR:9", "BR", "Presidente", "Pres Novo", "Partido K", 7001, votos=64256232, percentual=51.8
     )
-    fotos = tmp_path / "origem" / "2026" / "BR"
-    fotos.mkdir(parents=True)
-    (fotos / "9.jpg").write_bytes(b"jpg")
     saida = tmp_path / "dist"
-    construir(warehouse, saida, hoje=date(2026, 10, 29), fotos=tmp_path / "origem")
+    construir(warehouse, saida, hoje=date(2026, 10, 29), datalake=DATALAKE)
     inicio = texto(saida, "index.html")
     card = inicio[inicio.index('class="card presidente"') :]
     card = card[: card.index("</a>")]
-    assert 'src="fotos/2026/BR/9.jpg"' in card and "Partido K" in card and "64.256.232 votos" in card
+    assert f'src="{DATALAKE}/2026/BR/9.jpg"' in card and "Partido K" in card and "64.256.232 votos" in card
     assert 'href="pessoa/pres-novo-2026-br-9.html"' in card
 
 
@@ -715,14 +704,16 @@ def test_links_to_other_sites_open_in_a_new_tab_and_internal_ones_do_not(warehou
     assert 'href="https://www.instagram.com/' in ana
 
 
-def test_a_mandate_without_an_election_still_shows_up_and_does_not_repeat_one_that_has(warehouse, tmp_path):
-    warehouse.execute(  # exercício da Câmara de Ana em 2019 a 2022, igual ao mandato que a eleição de 2018 deu
-        "INSERT INTO marts.app_cargo_ocupantes VALUES (NULL, 10, 'Ana Exemplo', 'Deputado federal', 'RJ', 'Partido A',"
-        " 2019, DATE '2019-02-01', 'informado', DATE '2022-12-31', 'informado', NULL, NULL, DATE '2026-10-24')"
+def test_a_mandate_without_an_election_still_shows_up_and_does_not_repeat_one_that_has(
+    warehouse, exercicio, tmp_path
+):
+    # exercício da Câmara de Ana em 2019 a 2022, igual ao mandato que a eleição de 2018 deu
+    exercicio(
+        10, "Ana Exemplo", "Deputado federal", "RJ", "Partido A", 2019, date(2019, 2, 1), date(2022, 12, 31)
     )
-    warehouse.execute(  # e um mandato mais antigo, só com a Câmara como fonte
-        "INSERT INTO marts.app_cargo_ocupantes VALUES (NULL, 10, 'Ana Exemplo', 'Deputado federal', 'RJ', 'Partido A',"
-        " 2003, DATE '2003-02-01', 'informado', DATE '2007-01-31', 'informado', NULL, NULL, DATE '2026-10-24')"
+    # e um mandato mais antigo, só com a Câmara como fonte
+    exercicio(
+        10, "Ana Exemplo", "Deputado federal", "RJ", "Partido A", 2003, date(2003, 2, 1), date(2007, 1, 31)
     )
     pagina = texto(site(warehouse, tmp_path), "pessoa/ana-exemplo-2026-rj-1.html")
     assert pagina.count("Mandato de 2019 a 2022") == 1
@@ -730,12 +721,19 @@ def test_a_mandate_without_an_election_still_shows_up_and_does_not_repeat_one_th
 
 
 def test_whoever_is_in_office_without_an_election_of_their_own_still_counts_in_the_composition(
-    warehouse, tmp_path
+    warehouse, exercicio, tmp_path
 ):
-    warehouse.execute(  # exercício informado pelo Senado, sem candidatura: entrou no cargo em 2024
-        "INSERT INTO marts.app_cargo_ocupantes VALUES (NULL, 8000, 'Zé do Senado', 'Senador', 'Rio de Janeiro', 'Partido Z',"
-        " 2024, DATE '2024-05-01', 'informado', DATE '2027-01-31', 'informado', NULL, 'https://exemplo.leg.br/senado',"
-        " DATE '2026-10-24')"
+    # exercício informado pelo Senado, sem candidatura: entrou no cargo em 2024
+    exercicio(
+        8000,
+        "Zé do Senado",
+        "Senador",
+        "RJ",
+        "Partido Z",
+        2024,
+        date(2024, 5, 1),
+        date(2027, 1, 31),
+        "https://exemplo.leg.br/senado",
     )
     saida = site(warehouse, tmp_path)
     rj = texto(saida, "estado/RJ.html")
@@ -776,7 +774,6 @@ def test_every_page_has_a_share_button_that_only_works_with_javascript(warehouse
 
 
 def test_person_and_state_pages_share_their_own_card_and_the_others_share_the_brand_one(warehouse, tmp_path):
-    from PIL import Image
 
     saida = site(warehouse, tmp_path)
     ana = texto(saida, "pessoa/ana-exemplo-2026-rj-1.html")
@@ -799,13 +796,19 @@ def test_person_and_state_pages_share_their_own_card_and_the_others_share_the_br
     assert (saida / "og/estado/RJ.jpg").read_bytes() != (saida / "og/estado/SP.jpg").read_bytes()
 
 
-def test_an_unreadable_photo_does_not_break_the_cards(warehouse, tmp_path):
-    origem = tmp_path / "fotos" / "2026" / "RJ"
-    origem.mkdir(parents=True)
-    (origem / "1.jpg").write_bytes(b"isto nao e uma imagem")
-    saida = tmp_path / "dist"
-    construir(warehouse, saida, HOJE, fotos=tmp_path / "fotos")
-    assert (saida / "og/pessoa/ana-exemplo-2026-rj-1.jpg").is_file()
+def test_the_card_has_the_photo_read_from_the_datalake_and_an_unreachable_one_does_not_break_it(
+    warehouse, tmp_path
+):
+    cartao = "og/pessoa/ana-exemplo-2026-rj-1.jpg"
+    sem = tmp_path / "sem"
+    construir(warehouse, sem, HOJE, datalake=(tmp_path / "nada").as_uri())  # nenhum arquivo lá
+    assert (sem / cartao).is_file()
+    fotos = tmp_path / "datalake" / "2026" / "RJ"
+    fotos.mkdir(parents=True)
+    Image.new("RGB", (60, 80), (200, 30, 30)).save(fotos / "1.jpg")  # Ana, 2026:RJ:1
+    com = tmp_path / "com"
+    construir(warehouse, com, HOJE, datalake=(tmp_path / "datalake").as_uri())
+    assert (com / cartao).read_bytes() != (sem / cartao).read_bytes()
 
 
 def test_the_header_stays_at_the_top_on_every_width(warehouse, tmp_path):

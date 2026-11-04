@@ -8,32 +8,40 @@ import pytest
 
 TABELAS = (
     """CREATE TABLE marts.fct_candidaturas (
-        id_candidatura varchar, nome varchar, nome_urna varchar, ocupacao varchar, partido varchar,
-        id_pessoa bigint, foto_caminho varchar, fl_eleito boolean
+        id_candidatura varchar, id_disputa varchar, nome varchar, nome_urna varchar, ocupacao varchar,
+        partido varchar, id_pessoa bigint, foto_caminho varchar, resultado varchar, fl_eleito boolean
     )""",
     """CREATE TABLE marts.fct_resultados (
         id_candidatura varchar, turno integer, qtd_votos_nominais bigint, percentual_votos_validos decimal(5, 2)
     )""",
-    """CREATE TABLE marts.app_cargo_ocupantes (
-        id_candidatura varchar, id_pessoa bigint, nome varchar, cargo varchar, territorio varchar, partido varchar,
-        ano_inicio integer, dt_inicio date, base_do_inicio varchar, dt_fim_prevista date, base_eleicao varchar,
-        tipo_mandato varchar, fonte_url varchar, dt_captura date
+    """CREATE TABLE marts.fct_cargos_ocupacoes (
+        id_ocupacao varchar, id_pessoa bigint, id_cargo varchar, id_territorio varchar, id_partido integer,
+        id_candidatura varchar, ano_inicio integer, dt_inicio date, dt_fim date, id_captura bigint, dt_captura date
     )""",
-    """CREATE TABLE marts.app_pessoa_campanhas (
-        id_candidatura varchar, id_pessoa bigint, ano_eleicao integer, cargo varchar, partido varchar,
-        resultado varchar, fl_eleito boolean, valor_bens decimal(18, 2), valor_receitas decimal(18, 2),
-        valor_despesas decimal(18, 2), fonte_url_bens varchar, fonte_url_receitas varchar,
-        fonte_url_despesas varchar, dt_captura_campanha date
+    """CREATE TABLE marts.fct_mandatos (id_candidatura varchar, tipo_mandato varchar)""",
+    """CREATE TABLE marts.fct_campanhas (
+        id_candidatura varchar, valor_bens decimal(18, 2), valor_receitas decimal(18, 2),
+        valor_despesas decimal(18, 2), id_captura_bens bigint, id_captura_receitas bigint,
+        id_captura_despesas bigint, dt_captura date
     )""",
-    """CREATE TABLE marts.app_pessoas (
-        id_pessoa bigint, nome varchar, nome_civil varchar, dt_nascimento date, municipio_nascimento varchar,
-        uf_nascimento varchar, profissoes varchar, site_url varchar, rede_social_url varchar, foto_url varchar,
-        foto_caminho varchar, fontes varchar, fonte_url varchar, dt_captura date
+    """CREATE TABLE metadata.capturas (id_captura bigint, url varchar)""",
+    """CREATE TABLE marts.dim_pessoas (
+        id_pessoa bigint, nome_civil varchar, fonte_nome_civil varchar, nome_publico varchar,
+        dt_nascimento date, fonte_dt_nascimento varchar, uf_nascimento varchar, fonte_uf_nascimento varchar,
+        profissoes varchar, fonte_profissoes varchar, foto_caminho varchar, id_captura_tse bigint,
+        dt_captura_tse date
     )""",
-    """CREATE TABLE marts.dim_territorios (tipo varchar, nome varchar, sigla varchar)""",
+    """CREATE TABLE marts.dim_partidos (id_partido integer, sigla varchar)""",
+    """CREATE TABLE marts.dim_pessoas_cadastro (
+        id_pessoa bigint, municipio_nascimento varchar, site_url varchar, rede_social_url varchar,
+        foto_url varchar, fontes varchar, id_captura bigint, dt_captura date
+    )""",
+    """CREATE TABLE marts.dim_territorios (id_territorio varchar, tipo varchar, nome varchar, sigla varchar)""",
     """CREATE TABLE marts.dim_eleicoes (id_eleicao varchar, ano_eleicao integer)""",
     """CREATE TABLE marts.dim_cargos (id_cargo varchar, nome varchar)""",
-    """CREATE TABLE marts.dim_disputas (id_eleicao varchar, id_cargo varchar, ue varchar, qtd_vagas integer)""",
+    """CREATE TABLE marts.dim_disputas (
+        id_disputa varchar, id_eleicao varchar, id_cargo varchar, ue varchar, qtd_vagas integer
+    )""",
 )
 
 CAPTURA = date(2026, 10, 24)
@@ -45,7 +53,16 @@ CARGOS_DA_BASE = (
     ("deputado_federal", "Deputado federal"),
     ("deputado_estadual", "Deputado estadual"),
     ("deputado_distrital", "Deputado distrital"),
+    ("vereador", "Vereador"),
 )
+# vagas de 2026 por cargo e estado, para saber quem falta; as demais disputas têm uma vaga
+VAGAS = {
+    ("deputado_federal", "RJ"): 3,
+    ("senador", "RJ"): 2,
+    ("governador", "RJ"): 1,
+    ("presidente", "BR"): 1,
+    ("governador", "SP"): 1,
+}
 
 # id, uf, cargo, nome de urna, partido, votos, id_pessoa, tipo_mandato
 PESSOAS_ELEITAS = [
@@ -58,6 +75,40 @@ PESSOAS_ELEITAS = [
     ("2026:SP:6", "SP", "Deputado estadual", "Elisa Ficticia", "Partido D", 70500, 77, None),
     ("2026:DF:7", "DF", "Deputado distrital", "Fábio Exemplo", "Partido E", 12000, 800, None),
 ]
+
+
+def id_do_cargo(con: duckdb.DuckDBPyConnection, nome: str) -> str:
+    return str(con.execute("SELECT id_cargo FROM marts.dim_cargos WHERE nome = ?", (nome,)).fetchone()[0])
+
+
+def id_do_partido(con: duckdb.DuckDBPyConnection, sigla: str) -> int:
+    achado = con.execute("SELECT id_partido FROM marts.dim_partidos WHERE sigla = ?", (sigla,)).fetchone()
+    if achado:
+        return int(achado[0])
+    novo = int(con.execute("SELECT count(*) + 1 FROM marts.dim_partidos").fetchone()[0])
+    con.execute("INSERT INTO marts.dim_partidos VALUES (?, ?)", (novo, sigla))
+    return novo
+
+
+def garantir_pessoa(con: duckdb.DuckDBPyConnection, pessoa: int, nome: str) -> None:
+    if not con.execute("SELECT 1 FROM marts.dim_pessoas WHERE id_pessoa = ?", (pessoa,)).fetchone():
+        con.execute(
+            "INSERT INTO marts.dim_pessoas VALUES (?, NULL, NULL, ?, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)",
+            (pessoa, nome),
+        )
+
+
+def garantir_disputa(con: duckdb.DuckDBPyConnection, ano: int, id_cargo: str, uf: str) -> str:
+    id_eleicao, id_disputa = f"{ano}-1", f"{ano}:{id_cargo}:{uf}"
+    if not con.execute("SELECT 1 FROM marts.dim_eleicoes WHERE id_eleicao = ?", (id_eleicao,)).fetchone():
+        con.execute("INSERT INTO marts.dim_eleicoes VALUES (?, ?)", (id_eleicao, ano))
+    if not con.execute("SELECT 1 FROM marts.dim_disputas WHERE id_disputa = ?", (id_disputa,)).fetchone():
+        vagas = VAGAS.get((id_cargo, uf), 1) if ano == 2026 else 1
+        con.execute(
+            "INSERT INTO marts.dim_disputas VALUES (?, ?, ?, ?, ?)",
+            (id_disputa, id_eleicao, id_cargo, uf, vagas),
+        )
+    return id_disputa
 
 
 def inserir(
@@ -79,25 +130,79 @@ def inserir(
     ano = int(id_candidatura.split(":")[0])
     eleito = resultado.lower().startswith("eleito")
     foto = f"{ano}/{uf}/{id_candidatura.rsplit(':', 1)[-1]}.jpg"  # o caminho que a base informa
+    id_cargo = id_do_cargo(con, cargo)
+    garantir_pessoa(con, pessoa, urna)
     con.execute(
-        "INSERT INTO marts.fct_candidaturas VALUES (?, ?, ?, NULL, ?, ?, ?, ?)",
-        (id_candidatura, urna, urna, partido, pessoa, foto, eleito),
-    )
-    con.execute(
-        "INSERT INTO marts.app_pessoa_campanhas VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, NULL, NULL)",
-        (id_candidatura, pessoa, ano, cargo, partido, resultado, eleito),
+        "INSERT INTO marts.fct_candidaturas VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)",
+        (
+            id_candidatura,
+            garantir_disputa(con, ano, id_cargo, uf),
+            urna,
+            urna,
+            partido,
+            pessoa,
+            foto,
+            resultado,
+            eleito,
+        ),
     )
     if eleito:
         con.execute(
             "INSERT INTO marts.fct_resultados VALUES (?, 1, ?, ?)", (id_candidatura, votos, percentual)
         )
-    if eleito:
         anos = 8 if cargo == "Senador" else 4
         inicio, fim = (date(ano + 1, 1, 1), date(ano + anos, 12, 31)) if com_mandato else (None, None)
         con.execute(
-            "INSERT INTO marts.app_cargo_ocupantes VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'derivado', ?, 'informado', ?, ?, ?)",
-            (id_candidatura, pessoa, urna, cargo, uf, partido, ano + 1, inicio, fim, tipo, URL, CAPTURA),
+            "INSERT INTO marts.fct_cargos_ocupacoes VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)",
+            (
+                id_candidatura,
+                pessoa,
+                id_cargo,
+                uf,
+                id_do_partido(con, partido),
+                id_candidatura,
+                ano + 1,
+                inicio,
+                fim,
+                CAPTURA,
+            ),
         )
+        con.execute("INSERT INTO marts.fct_mandatos VALUES (?, ?)", (id_candidatura, tipo))
+
+
+def exercer(
+    con: duckdb.DuckDBPyConnection,
+    pessoa: int,
+    nome: str,
+    cargo: str,
+    uf: str,
+    partido: str,
+    ano: int,
+    inicio: date,
+    fim: date,
+    url: str | None = None,
+) -> None:
+    """Um período no cargo informado pela casa, sem candidatura própria (sem `id_candidatura`)."""
+    garantir_pessoa(con, pessoa, nome)
+    captura = None
+    if url:
+        captura = 100 + int(con.execute("SELECT count(*) FROM metadata.capturas").fetchone()[0])
+        con.execute("INSERT INTO metadata.capturas VALUES (?, ?)", (captura, url))
+    con.execute(
+        "INSERT INTO marts.fct_cargos_ocupacoes VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)",
+        (
+            f"exercicio:{pessoa}:{ano}:{uf}",
+            pessoa,
+            id_do_cargo(con, cargo),
+            uf,
+            id_do_partido(con, partido),
+            ano,
+            inicio,
+            fim,
+            captura,
+            CAPTURA,
+        ),
+    )
 
 
 @pytest.fixture
@@ -106,14 +211,20 @@ def candidatura(warehouse: duckdb.DuckDBPyConnection) -> Callable[..., None]:
 
 
 @pytest.fixture
+def exercicio(warehouse: duckdb.DuckDBPyConnection) -> Callable[..., None]:
+    return lambda *args, **kwargs: exercer(warehouse, *args, **kwargs)
+
+
+@pytest.fixture
 def warehouse(tmp_path) -> Iterator[duckdb.DuckDBPyConnection]:
     con = duckdb.connect(str(tmp_path / "warehouse.duckdb"))
     con.execute("CREATE SCHEMA marts")
+    con.execute("CREATE SCHEMA metadata")
     for ddl in TABELAS:
         con.execute(ddl)
     for id_cargo, nome in CARGOS_DA_BASE:
         con.execute("INSERT INTO marts.dim_cargos VALUES (?, ?)", (id_cargo, nome))
-    con.execute("INSERT INTO marts.dim_eleicoes VALUES ('2026-1', 2026)")
+    con.execute("INSERT INTO metadata.capturas VALUES (1, ?)", (URL,))
     for id_, uf, cargo, urna, partido, votos, pessoa, tipo in PESSOAS_ELEITAS:
         # os deputados estaduais e distritais de 2026 ainda não têm data de posse na base
         inserir(
@@ -154,53 +265,57 @@ def warehouse(tmp_path) -> Iterator[duckdb.DuckDBPyConnection]:
         inserir(con, id_, uf, cargo, urna, partido, pessoa)
     # a de Ana em 2018 começa em 1º de fev. de 2019, sem lacuna com o mandato de 2023
     con.execute(
-        "UPDATE marts.app_cargo_ocupantes SET dt_inicio = DATE '2019-02-01', dt_fim_prevista = DATE '2022-12-31' "
+        "UPDATE marts.fct_cargos_ocupacoes SET dt_inicio = DATE '2019-02-01', dt_fim = DATE '2022-12-31' "
         "WHERE id_candidatura IN ('2018:RJ:ANA', '2018:RJ:BRUNO')"
     )
     # candidaturas sem mandato
-    for id_, ano, cargo, partido, pessoa, resultado in (
-        ("2018:RJ:ANA-G", 2018, "Governador", "Partido A", 10, "Não eleito"),
-        ("2018:RJ:CARLA", 2018, "Deputado estadual", "Partido C", 12, "Não eleito"),
-        ("2014:RJ:BRUNO", 2014, "Vereador", "Partido B", 500, "Suplente"),
+    for id_, cargo, urna, partido, pessoa, resultado in (
+        ("2018:RJ:ANA-G", "Governador", "Ana Exemplo", "Partido A", 10, "Não eleito"),
+        ("2018:RJ:CARLA", "Deputado estadual", "<b>Carla</b> Teste", "Partido C", 12, "Não eleito"),
+        ("2014:RJ:BRUNO", "Vereador", "Bruno Modelo", "Partido B", 500, "Suplente"),
     ):
-        con.execute(
-            "INSERT INTO marts.app_pessoa_campanhas VALUES (?, ?, ?, ?, ?, ?, false, NULL, NULL, NULL, NULL, NULL, NULL, NULL)",
-            (id_, pessoa, ano, cargo, partido, resultado),
-        )
+        inserir(con, id_, "RJ", cargo, urna, partido, pessoa, resultado=resultado)
     # só a primeira pessoa tem total de campanha; as demais ficam sem dado (vazio, não zero)
+    con.execute("INSERT INTO metadata.capturas VALUES (2, 'https://exemplo.gov.br/bens.zip')")
+    con.execute("INSERT INTO metadata.capturas VALUES (3, 'https://exemplo.gov.br/contas.zip')")
     con.execute(
-        "UPDATE marts.app_pessoa_campanhas SET valor_bens = 1200000, valor_receitas = 2400000, valor_despesas = 2300000,"
-        " fonte_url_bens = 'https://exemplo.gov.br/bens.zip', fonte_url_receitas = 'https://exemplo.gov.br/contas.zip',"
-        " fonte_url_despesas = 'https://exemplo.gov.br/contas.zip', dt_captura_campanha = DATE '2026-10-24'"
-        " WHERE id_candidatura = '2026:RJ:1'"
+        "INSERT INTO marts.fct_campanhas VALUES ('2026:RJ:1', 1200000, 2400000, 2300000, 2, 3, 3, DATE '2026-10-24')"
     )
-    # vagas por cargo e estado, para saber quem falta
-    for id_cargo, uf, vagas in (
-        ("deputado_federal", "RJ", 3),
-        ("senador", "RJ", 2),
-        ("governador", "RJ", 1),
-        ("presidente", "BR", 1),
-        ("governador", "SP", 1),
-    ):
-        con.execute("INSERT INTO marts.dim_disputas VALUES ('2026-1', ?, ?, ?)", (id_cargo, uf, vagas))
-    # Ana (10) tem cadastro completo; Carla (12) e Nina (14) só a foto, para mostrar Sem dado
+    # Ana (10) tem o cadastro da Câmara; Carla (12) e Nina (14) só a linha do cadastro, para mostrar Sem dado;
+    # Bruno (500), só o que o TSE informa
     con.execute(
-        "INSERT INTO marts.app_pessoas VALUES (10, 'Ana Exemplo', 'Ana Maria Exemplo da Silva', DATE '1975-03-09',"
-        " 'Niterói', 'RJ', 'Advogada; professora', 'https://exemplo.gov.br/ana', 'javascript:alert(1),"
-        " https://www.instagram.com/ana.exemplo/?hl=pt&igsh=abcdefghijklmnopqrstuvwxyz0123456789,"
-        "https://twitter.com/anaexemplo', 'https://exemplo.gov.br/foto10.jpg', NULL, 'camara',"
-        " 'https://dadosabertos.camara.leg.br/arquivos/deputados/csv/deputados.csv', ?),"
-        " (12, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'camara', NULL, NULL),"
-        " (14, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'senado', NULL, NULL),"
-        " (500, 'Bruno Modelo', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,"
-        " 'https://cdn.tse.jus.br/estatistica/sead/odsele/consulta_cand/consulta_cand_2026.zip', ?)",
-        (CAPTURA, CAPTURA),
+        "INSERT INTO metadata.capturas VALUES (4, "
+        "'https://dadosabertos.camara.leg.br/arquivos/deputados/csv/deputados.csv')"
     )
-    for tipo, nome, sigla in (
-        ("pais", "Brasil", "BR"),
-        ("uf", "Rio de Janeiro", "RJ"),
-        ("uf", "São Paulo", "SP"),
+    con.execute(
+        "INSERT INTO metadata.capturas VALUES (5, "
+        "'https://cdn.tse.jus.br/estatistica/sead/odsele/consulta_cand/consulta_cand_2026.zip')"
+    )
+    con.execute(
+        "UPDATE marts.dim_pessoas SET nome_civil = 'Ana Maria Exemplo da Silva', fonte_nome_civil = 'camara',"
+        " dt_nascimento = DATE '1975-03-09', fonte_dt_nascimento = 'camara', uf_nascimento = 'RJ',"
+        " fonte_uf_nascimento = 'camara', profissoes = 'Advogada; professora', fonte_profissoes = 'camara'"
+        " WHERE id_pessoa = 10"
+    )
+    con.execute(
+        "UPDATE marts.dim_pessoas SET nome_civil = 'Bruno Modelo', fonte_nome_civil = 'tse', id_captura_tse = 5,"
+        " dt_captura_tse = ? WHERE id_pessoa = 500",
+        (CAPTURA,),
+    )
+    con.execute(
+        "INSERT INTO marts.dim_pessoas_cadastro VALUES (10, 'Niterói', 'https://exemplo.gov.br/ana',"
+        " 'javascript:alert(1), https://www.instagram.com/ana.exemplo/?hl=pt&igsh=abcdefghijklmnopqrstuvwxyz0123456789,"
+        "https://twitter.com/anaexemplo', 'https://exemplo.gov.br/foto10.jpg', 'camara', 4, ?),"
+        " (12, NULL, NULL, NULL, NULL, 'camara', NULL, NULL),"
+        " (14, NULL, NULL, NULL, NULL, 'senado', NULL, NULL)",
+        (CAPTURA,),
+    )
+    for sigla, tipo, nome in (
+        ("BR", "pais", "Brasil"),
+        ("RJ", "uf", "Rio de Janeiro"),
+        ("SP", "uf", "São Paulo"),
+        ("DF", "uf", "Distrito Federal"),
     ):
-        con.execute("INSERT INTO marts.dim_territorios VALUES (?, ?, ?)", (tipo, nome, sigla))
+        con.execute("INSERT INTO marts.dim_territorios VALUES (?, ?, ?, ?)", (sigla, tipo, nome, sigla))
     yield con
     con.close()

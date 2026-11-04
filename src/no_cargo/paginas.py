@@ -151,7 +151,7 @@ def pagina(
 
 
 def nao_encontrada() -> str:
-    """A página 404 do GitHub Pages: leva de volta ao início e à lista de pessoas. Fora do índice dos buscadores."""
+    """A página 404: leva de volta ao início e à lista de pessoas. Fora do índice dos buscadores."""
     corpo = (
         '<section class="heroi"><span class="sobretitulo">404</span><h1>Esta página não existe</h1>'
         "<p>O endereço pode ter mudado. Procure a pessoa pelo nome ou volte ao início.</p></section>"
@@ -584,7 +584,7 @@ def cartao_de_pessoa(r: Row) -> str:
         f'<a class="card pessoa" href="../pessoa/{r.get("ficha") or arquivo_da_ficha(r["nome_urna"], r["id_candidatura"])}" data-nome="{e(str(r["nome_urna"]).lower())}" '
         f'data-partido="{e(str(r["partido"]).lower())}" data-tipo="{e(r["tipo_mandato"] or "sem")}" '
         f'data-grupo="{"novo" if r.get("novo") else "antes"}" '
-        f'data-votos="{r["qtd_votos"] or 0}">{foto(r["foto_url"], r["nome_urna"], 60, r.get("foto_local"), "../")}'
+        f'data-votos="{r["qtd_votos"] or 0}">{foto(r["foto_url"], r["nome_urna"], 60, r.get("foto_local"))}'
         f'<span class="dados"><b>{e(r["nome_urna"])}</b><span>{detalhe}</span>{selo(r["tipo_mandato"], r["cargo"])}</span>'
         '<i aria-hidden="true">&#8250;</i></a>'
     )
@@ -858,18 +858,29 @@ def sobre_a_pessoa(r: Row) -> str:
         ("Site", links_oficiais(r["site_url"])),
         ("Rede social", links_oficiais(r["rede_social_url"])),
     )
+    usadas = {
+        r[fonte]
+        for fonte, valor in (
+            ("fonte_nome_civil", "nome_civil"),
+            ("fonte_dt_nascimento", "dt_nascimento"),
+            ("fonte_uf_nascimento", "uf_nascimento"),
+            ("fonte_profissoes", "profissoes"),
+        )
+        if r[valor] and r[fonte]
+    }
+
+    def capturado(dia: date | None) -> str:
+        return f", capturado em {data_curta(dia)}" if dia else ""
+
+    fontes = []
     if casa:
-        capturado = (
-            f", capturado em {data_curta(r['dt_captura_cadastro'])}" if r["dt_captura_cadastro"] else ""
-        )
-        fonte = f"Fonte: {link_da_fonte(r['fonte_cadastro_url'], 'cadastro da ' + casa)}{capturado}."
-        if profissao_tse:
-            fonte += f" Profissão: TSE, capturado em {data_curta(r['dt_captura'])}."
-    else:
-        capturado = (
-            f", capturado em {data_curta(r['dt_captura_cadastro'])}" if r["dt_captura_cadastro"] else ""
-        )
-        fonte = f"Fonte: {link_da_fonte(r['fonte_cadastro_url'], 'TSE')}{capturado}."
+        link = link_da_fonte(r["fonte_cadastro_url"], "cadastro da " + casa)
+        fontes.append(f"{link}{capturado(r['dt_captura_cadastro'])}")
+    if "tse" in usadas:
+        fontes.append(f"{link_da_fonte(r['fonte_tse_url'], 'TSE')}{capturado(r['dt_captura_tse'])}")
+    fonte = f"Fonte: {'; '.join(fontes)}." if fontes else "Sem fonte de cadastro."
+    if profissao_tse:
+        fonte += f" Profissão: TSE, capturado em {data_curta(r['dt_captura'])}."
     return grade(linhas, largos=("Nome completo",), numeros=("Nascimento",)) + f'<p class="nota">{fonte}</p>'
 
 
@@ -991,7 +1002,7 @@ def ficha(
             ]
         ),
         '<section class="heroi ficha">',
-        f'<div class="cabeca">{foto(r["foto_url"], r["nome_urna"], 104, r.get("foto_local"), "../")}<div><h1>{e(r["nome_urna"])}</h1>'
+        f'<div class="cabeca">{foto(r["foto_url"], r["nome_urna"], 104, r.get("foto_local"))}<div><h1>{e(r["nome_urna"])}</h1>'
         f'<p>{e(cargo)} &middot; {e(r["uf"] if r["uf"] != "BR" else "Brasil")}</p><p class="partido">Partido {e(r["partido"])}</p></div></div>'
         + (
             '<div class="selos"><span class="selo semselo">Mandato em curso</span></div>'

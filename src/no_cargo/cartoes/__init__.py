@@ -1,11 +1,14 @@
 """Cartões de compartilhamento (Open Graph, 1200 x 630): um por pessoa e um por estado, na marca.
 
 As cores são as de `static/tokens.css`; as fontes (Fraunces e Inter, licença OFL) ficam em `cartoes/fontes/`,
-porque o Pillow lê TrueType e o site serve as mesmas famílias em woff2. Não usa rede nem navegador.
+porque o Pillow lê TrueType e o site serve as mesmas famílias em woff2. A única rede é a foto da pessoa, lida
+do datalake na hora e não guardada.
 """
 
 from functools import cache
+from io import BytesIO
 from pathlib import Path
+from urllib.request import Request, urlopen
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
@@ -37,10 +40,20 @@ def _simbolo() -> Image.Image:
         return og.convert("RGB").crop((84, 96, 180, 192)).copy()
 
 
-def _retrato(foto: Path, diametro: int) -> Image.Image | None:
-    """A foto recortada em quadrado; arquivo ausente ou ilegível não derruba o site: o cartão sai sem foto."""
+def baixar(endereco: str) -> bytes | None:
+    """Lê a foto no datalake, sem guardá-la; se falhar, o cartão sai sem foto."""
     try:
-        with Image.open(foto) as origem:
+        pedido = Request(endereco, headers={"User-Agent": "no-cargo"})
+        with urlopen(pedido, timeout=30) as resposta:  # noqa: S310
+            return bytes(resposta.read())
+    except (OSError, ValueError):
+        return None
+
+
+def _retrato(foto: bytes, diametro: int) -> Image.Image | None:
+    """A foto recortada em quadrado; ilegível não derruba o site: o cartão sai sem foto."""
+    try:
+        with Image.open(BytesIO(foto)) as origem:
             return ImageOps.fit(
                 origem.convert("RGB"), (diametro, diametro), Image.Resampling.LANCZOS, centering=(0.5, 0.3)
             )
@@ -86,7 +99,7 @@ def cartao(
     linhas: list[str],
     etiqueta: str,
     saida: Path,
-    foto: Path | None = None,
+    foto: bytes | None = None,
     endereco: str = "nocargo.codigopublicobrasil.com.br",
 ) -> None:
     """Escreve o cartão em `saida` (JPEG). Com `foto`, a pessoa aparece à esquerda, em círculo."""
